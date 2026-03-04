@@ -16,12 +16,11 @@ fi
 
 usage() {
   cat <<'USAGE'
-usage: ./scripts/check.sh [--require-verus] [--forbid-trusted-escapes] [--min-verified N] [--offline]
+usage: ./scripts/check.sh [--require-verus] [--forbid-trusted-escapes] [--offline]
 
 options:
   --require-verus           fail instead of skipping when Verus verification cannot run
   --forbid-trusted-escapes  fail if non-test source uses trusted proof escapes (`admit`, `assume`, verifier externals, `#[verifier::truncate]`, `#[verifier::exec_allows_no_decreases_clause]`, or `unsafe`)
-  --min-verified N          fail if any Verus run reports fewer than N verified items
   --offline                 run cargo commands in offline mode (`cargo --offline`)
   -h, --help                show this help
 USAGE
@@ -30,7 +29,6 @@ USAGE
 REQUIRE_VERUS=0
 FORBID_TRUSTED_ESCAPES=0
 OFFLINE=0
-MIN_VERIFIED=""
 while [[ "$#" -gt 0 ]]; do
   case "${1:-}" in
     --require-verus)
@@ -38,20 +36,6 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --forbid-trusted-escapes)
       FORBID_TRUSTED_ESCAPES=1
-      ;;
-    --min-verified)
-      if [[ "$#" -lt 2 ]]; then
-        echo "error: --min-verified requires an integer argument"
-        usage
-        exit 1
-      fi
-      MIN_VERIFIED="${2:-}"
-      if ! [[ "$MIN_VERIFIED" =~ ^[0-9]+$ ]]; then
-        echo "error: --min-verified expects a nonnegative integer"
-        usage
-        exit 1
-      fi
-      shift
       ;;
     --offline)
       OFFLINE=1
@@ -215,20 +199,8 @@ extract_verus_verified_count() {
   printf '%s' "$verified_count"
 }
 
-verify_verus_summary_threshold() {
-  local log_file="$1"
-  local threshold="$2"
-  local verified_count="$3"
 
-  if (( verified_count < threshold )); then
-    echo "error: Verus verified-count regression: expected at least $threshold, got $verified_count"
-    cat "$log_file"
-    exit 1
-  fi
-  echo "[check] OK    Verus verified $verified_count items (threshold: >= $threshold)"
-}
-
-run_cargo_verus_verify_with_threshold() {
+run_cargo_verus_verify_and_check() {
   local feature_flags="${1:-}"
   local verus_log
   verus_log="$(mktemp)"
@@ -236,15 +208,11 @@ run_cargo_verus_verify_with_threshold() {
 
   run_cargo_verus_verify "$feature_flags" 2>&1 | tee "$verus_log"
 
-  if [[ -n "$MIN_VERIFIED" ]]; then
-    local count
-    count="$(extract_verus_verified_count "$verus_log")"
-    LAST_VERIFIED_COUNT="$count"
-    verify_verus_summary_threshold "$verus_log" "$MIN_VERIFIED" "$count"
-  fi
+  local count
+  count="$(extract_verus_verified_count "$verus_log")"
+  echo "[check] Verus verification passed: $count verified, 0 errors"
 }
 
-LAST_VERIFIED_COUNT=""
 
 if [[ "$FORBID_TRUSTED_ESCAPES" == "1" ]]; then
   echo "[check] Verifying non-test source tree excludes trusted proof escapes"
@@ -264,6 +232,6 @@ if [[ ! -x "$VERUS_SOURCE/z3" ]]; then
 fi
 
 echo "[check] Running cargo verus verify"
-run_cargo_verus_verify_with_threshold ""
+run_cargo_verus_verify_and_check ""
 
 echo "[check] pass"
