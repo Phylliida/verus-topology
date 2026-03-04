@@ -12,3 +12,18 @@ pub mod checkers;
 
 #[cfg(verus_keep_ghost)]
 pub mod construction;
+
+#[cfg(verus_keep_ghost)]
+pub mod queries;
+
+#[cfg(verus_keep_ghost)]
+pub mod euler_ops;
+
+#[cfg(verus_keep_ghost)]
+pub mod refinement;
+
+#[cfg(verus_keep_ghost)]
+pub mod geometric_mesh;
+
+#[cfg(verus_keep_ghost)]
+pub mod construction_proofs;
