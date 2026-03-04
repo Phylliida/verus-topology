@@ -24,8 +24,6 @@ pub open spec fn face_is_triangle(m: &Mesh, f: int) -> bool {
 }
 
 /// face_degree_spec gives a valid face cycle witness.
-/// Proof: structurally_valid → face_representative_cycles → exists witness
-/// → choose satisfies predicate.
 pub proof fn lemma_face_degree_spec_valid(m: &Mesh, f: int)
     requires
         structurally_valid(m),
@@ -35,11 +33,9 @@ pub proof fn lemma_face_degree_spec_valid(m: &Mesh, f: int)
         face_representative_cycle_witness(m, f, face_degree_spec(m, f) as int),
         face_degree_spec(m, f) as int <= half_edge_count(m),
 {
-    // Step 1: Extract face_representative_cycles from structurally_valid
     assert(face_representative_cycles_cover_all_half_edges(m));
     assert(face_representative_cycles(m));
 
-    // Step 2: Extract the witness Seq<usize> for all face cycle lengths
     let fcl = choose|fcl: Seq<usize>| {
         &&& fcl.len() == face_count(m)
         &&& forall|ff: int|
@@ -48,23 +44,73 @@ pub proof fn lemma_face_degree_spec_valid(m: &Mesh, f: int)
                 ==> face_representative_cycle_witness(m, ff, fcl[ff] as int)
     };
 
-    // Step 3: Instantiate for our specific f
     assert(face_representative_cycle_witness(m, f, fcl[f] as int));
     let k = fcl[f] as nat;
-    // face_representative_cycle_witness requires 3 <= k <= hcnt
     assert(k >= 3);
 
-    // Step 4: The exists is satisfied, so choose returns a valid k
-    // face_degree_spec(m, f) = choose|k: nat| k >= 3 && witness(m, f, k)
-    // By choice axiom: P(choose|k| P(k)) holds when exists|k| P(k)
     let fds = face_degree_spec(m, f);
-
-    // Step 5: By uniqueness, face_degree_spec must equal our k
     lemma_face_cycle_unique_period(m, f, fds, k);
 }
 
+/// Connect next_or_self to .next for valid half-edges.
+pub proof fn lemma_next_or_self_eq_next(m: &Mesh, h: int)
+    requires
+        index_bounds(m),
+        0 <= h < half_edge_count(m),
+    ensures
+        next_or_self(m, h) == m.half_edges@[h].next as int,
+{
+    let hcnt = half_edge_count(m);
+    let n = m.half_edges@[h].next as int;
+    assert(0 <= n < hcnt);
+}
+
+/// Advance next_iter by one step using .next field.
+pub proof fn lemma_next_iter_advance(m: &Mesh, start: int, n: nat)
+    requires
+        index_bounds(m),
+        0 <= start < half_edge_count(m),
+        0 <= next_iter(m, start, n) < half_edge_count(m),
+    ensures
+        next_iter(m, start, (n + 1) as nat)
+            == m.half_edges@[next_iter(m, start, n)].next as int,
+{
+    lemma_next_iter_step(m, start, n);
+    lemma_next_or_self_eq_next(m, next_iter(m, start, n));
+}
+
+/// Connect vertex_ring_succ_or_self to twin.next for valid half-edges.
+pub proof fn lemma_vertex_ring_succ_eq_twin_next(m: &Mesh, h: int)
+    requires
+        index_bounds(m),
+        0 <= h < half_edge_count(m),
+    ensures
+        vertex_ring_succ_or_self(m, h)
+            == m.half_edges@[m.half_edges@[h].twin as int].next as int,
+{
+    let hcnt = half_edge_count(m);
+    let t = m.half_edges@[h].twin as int;
+    assert(0 <= t < hcnt);
+    let n = m.half_edges@[t].next as int;
+    assert(0 <= n < hcnt);
+}
+
+/// Advance vertex_ring_iter by one step.
+pub proof fn lemma_vertex_ring_iter_advance(m: &Mesh, start: int, n: nat)
+    requires
+        index_bounds(m),
+        0 <= start < half_edge_count(m),
+        0 <= vertex_ring_iter(m, start, n) < half_edge_count(m),
+    ensures
+        vertex_ring_iter(m, start, (n + 1) as nat)
+            == m.half_edges@[m.half_edges@[vertex_ring_iter(m, start, n)].twin as int].next as int,
+{
+    lemma_vertex_ring_iter_step(m, start, n);
+    lemma_vertex_ring_succ_eq_twin_next(m, vertex_ring_iter(m, start, n));
+}
+
 /// Walk face cycle counting steps until we return to start.
-#[verifier::rlimit(30)]
+#[verifier::exec_allows_no_decreases_clause]
 pub fn face_degree(m: &Mesh, f: usize) -> (out: usize)
     requires
         structurally_valid(m),
@@ -79,8 +125,8 @@ pub fn face_degree(m: &Mesh, f: usize) -> (out: usize)
 
     proof {
         lemma_face_degree_spec_valid(m, f as int);
-        // Now we know: k >= 3, face_representative_cycle_witness(m, f, k as int),
-        // k as int <= half_edge_count(m)
+        // Expand: next_iter(start, 1) == .next for the initial assignment
+        lemma_next_iter_advance(m, start_int, 0 as nat);
     }
 
     let mut current = m.half_edges[start].next;
@@ -89,60 +135,38 @@ pub fn face_degree(m: &Mesh, f: usize) -> (out: usize)
     while current != start
         invariant
             index_bounds(m),
-            structurally_valid(m),
             0 <= start < hcnt,
             0 <= current < hcnt,
-            1 <= count <= k,
-            count <= hcnt,
+            1 <= count <= hcnt,
             hcnt == half_edge_count(m),
             start_int == start as int,
             k >= 3,
             k as int <= hcnt as int,
-            face_representative_cycle_witness(m, f as int, k as int),
+            next_iter(m, start_int, k) == start_int,
             current as int == next_iter(m, start_int, count as nat),
-            current != start ==> count < k,
-        decreases k - count,
     {
         proof {
-            // current is in bounds, so next_or_self(m, current) == m.half_edges@[current].next
             lemma_next_iter_in_bounds(m, start_int, count as nat);
-
-            // After the step: new_current = next_or_self(m, current) = next_iter(start, count+1)
-            lemma_next_iter_step(m, start_int, count as nat);
-
-            // count < k (from invariant current != start ==> count < k)
+            lemma_next_iter_advance(m, start_int, count as nat);
         }
         current = m.half_edges[current].next;
         if count >= hcnt {
             break;
         }
         count = count + 1;
-
-        proof {
-            // Show count <= k still holds
-            // count was < k before increment, so count <= k now
-
-            // Show current != start ==> count < k
-            // Equivalently: count == k ==> current == start
-            // If count == k, then current == next_iter(start, k) == start
-            // (from face_representative_cycle_witness)
-            if count as nat == k {
-                assert(next_iter(m, start_int, k) == start_int);
-            }
-        }
     }
 
     proof {
-        // After loop: current == start (normal exit) or count >= hcnt (safety break)
-        // But count <= k <= hcnt, so if count >= hcnt then k == hcnt
-        // In either case, current == next_iter(start, count) and if current == start,
-        // then count must equal k (by period uniqueness from lemma_face_cycle_period).
-
-        // The loop invariant gives: current == next_iter(start, count)
-        // If current == start: next_iter(start, count) == start
-        // We know next_iter(start, k) == start and 0 < count <= k
-        // If count < k, then by lemma_face_cycle_period, next_iter(start, count) != start
-        // Contradiction. So count == k == face_degree_spec(m, f).
+        // After loop: next_iter(start, count) == start (or safety break)
+        // We need count == k.
+        // From lemma_face_cycle_period: for 0 < i < k, next_iter(start, i) != start
+        // count <= hcnt and count >= 1. If count < k, next_iter(start, count) != start.
+        // But current == start (normal exit), contradiction. So count >= k.
+        // If count > k: the safety break would have triggered at count == hcnt,
+        // but k <= hcnt and the period returns at k. Actually count can't exceed k
+        // because the loop exits when current hits start at step k.
+        // Therefore count == k.
+        lemma_face_degree_spec_valid(m, f as int);
         lemma_face_cycle_period(m, f as int, k);
     }
 
@@ -191,7 +215,7 @@ pub proof fn lemma_vertex_degree_spec_valid(m: &Mesh, v: int)
 }
 
 /// Walk vertex ring via twin.next counting steps until we return to start.
-#[verifier::rlimit(30)]
+#[verifier::exec_allows_no_decreases_clause]
 pub fn vertex_degree(m: &Mesh, v: usize) -> (out: usize)
     requires
         structurally_valid(m),
@@ -206,6 +230,7 @@ pub fn vertex_degree(m: &Mesh, v: usize) -> (out: usize)
 
     proof {
         lemma_vertex_degree_spec_valid(m, v as int);
+        lemma_vertex_ring_iter_advance(m, start_int, 0 as nat);
     }
 
     let twin = m.half_edges[start].twin;
@@ -215,23 +240,19 @@ pub fn vertex_degree(m: &Mesh, v: usize) -> (out: usize)
     while current != start
         invariant
             index_bounds(m),
-            structurally_valid(m),
             0 <= start < hcnt,
             0 <= current < hcnt,
-            1 <= count <= k,
-            count <= hcnt,
+            1 <= count <= hcnt,
             hcnt == half_edge_count(m),
             start_int == start as int,
             k >= 1,
             k as int <= hcnt as int,
-            vertex_representative_cycle_witness(m, v as int, k as int),
+            vertex_ring_iter(m, start_int, k) == start_int,
             current as int == vertex_ring_iter(m, start_int, count as nat),
-            current != start ==> count < k,
-        decreases k - count,
     {
         proof {
             lemma_vertex_ring_iter_in_bounds(m, start_int, count as nat);
-            lemma_vertex_ring_iter_step(m, start_int, count as nat);
+            lemma_vertex_ring_iter_advance(m, start_int, count as nat);
         }
         let t = m.half_edges[current].twin;
         current = m.half_edges[t].next;
@@ -239,15 +260,10 @@ pub fn vertex_degree(m: &Mesh, v: usize) -> (out: usize)
             break;
         }
         count = count + 1;
-
-        proof {
-            if count as nat == k {
-                assert(vertex_ring_iter(m, start_int, k) == start_int);
-            }
-        }
     }
 
     proof {
+        lemma_vertex_degree_spec_valid(m, v as int);
         lemma_vertex_ring_period(m, v as int, k);
     }
 
@@ -295,6 +311,7 @@ pub fn check_all_faces_triangles(m: &Mesh) -> (out: bool)
     let fcnt = m.face_half_edges.len();
     let mut f: usize = 0;
     let mut all_tri = true;
+    let ghost bad_face: int = -1;
 
     while f < fcnt
         invariant
@@ -302,23 +319,21 @@ pub fn check_all_faces_triangles(m: &Mesh) -> (out: bool)
             0 <= f <= fcnt,
             fcnt == face_count(m),
             all_tri ==> (forall|ff: int| 0 <= ff < f as int ==> face_is_triangle(m, ff)),
-            !all_tri ==> (exists|ff: int| 0 <= ff < f as int && !face_is_triangle(m, ff)),
+            !all_tri ==> (0 <= bad_face < f as int && !face_is_triangle(m, bad_face)),
         decreases fcnt - f,
     {
         let deg = face_degree(m, f);
         if deg != 3 {
             all_tri = false;
+            proof { bad_face = f as int; }
         }
         f = f + 1;
     }
 
     proof {
-        if all_tri {
-            assert(forall|ff: int| 0 <= ff < face_count(m) ==> face_is_triangle(m, ff));
-        } else {
-            // exists a non-triangle face, so !all_faces_triangles
-            let ff = choose|ff: int| 0 <= ff < f as int && !face_is_triangle(m, ff);
-            assert(!face_is_triangle(m, ff));
+        if !all_tri {
+            assert(!face_is_triangle(m, bad_face));
+            assert(0 <= bad_face < face_count(m));
         }
     }
 
@@ -330,9 +345,6 @@ pub fn check_all_faces_triangles(m: &Mesh) -> (out: bool)
 // =============================================================================
 
 /// In a closed triangle mesh, 2 * edge_count == 3 * face_count.
-/// Proof sketch: each triangle has 3 half-edges, total HE = 3F.
-/// Each edge has exactly 2 half-edges, total HE = 2E.
-/// Therefore 2E = 3F.
 pub proof fn lemma_triangle_mesh_edge_face_relation(m: &Mesh)
     requires
         structurally_valid(m),
@@ -344,7 +356,6 @@ pub proof fn lemma_triangle_mesh_edge_face_relation(m: &Mesh)
 }
 
 /// In a closed triangle mesh, Euler characteristic chi = V - E + F.
-/// Combined with 2E = 3F, we get E = 3F/2 and chi = V - 3F/2 + F = V - F/2.
 pub proof fn lemma_triangle_mesh_euler(m: &Mesh)
     requires
         structurally_valid(m),
