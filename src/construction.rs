@@ -19,6 +19,192 @@ pub enum MeshBuildError {
     Overflow,
 }
 
+/// Post-Phase-D helper: verify edge properties.
+/// Extracted to give Z3 a separate verification context.
+#[verifier::exec_allows_no_decreases_clause]
+fn verify_edge_properties(
+    half_edges: &Vec<HalfEdge>,
+    edge_half_edges: &Vec<usize>,
+) -> (result: Result<(), MeshBuildError>)
+    requires
+        half_edges@.len() > 0,
+        // All twins valid
+        forall|k: int| 0 <= k < half_edges@.len() ==>
+            ((#[trigger] half_edges@[k]).twin as int) < half_edges@.len(),
+        // All edges valid
+        forall|k: int| 0 <= k < half_edges@.len() ==>
+            ((#[trigger] half_edges@[k]).edge as int) < edge_half_edges@.len(),
+        // edge_half_edges valid
+        forall|e: int| 0 <= e < edge_half_edges@.len() ==>
+            (#[trigger] edge_half_edges@[e] as int) < half_edges@.len(),
+    ensures
+        result is Ok ==> {
+            // Edge(h) == edge(twin(h)) for all h
+            &&& forall|k: int| 0 <= k < half_edges@.len() ==>
+                (#[trigger] half_edges@[k]).edge
+                    == half_edges@[half_edges@[k].twin as int].edge
+            // edge_half_edges[edge(h)] is h or twin(h)
+            &&& forall|k: int| 0 <= k < half_edges@.len() ==> {
+                let e = (#[trigger] half_edges@[k]).edge as int;
+                let t = half_edges@[k].twin as int;
+                (edge_half_edges@[e] as int == k || edge_half_edges@[e] as int == t)
+            }
+            // h != twin(h) for all h
+            &&& forall|k: int| 0 <= k < half_edges@.len() ==>
+                k != (#[trigger] half_edges@[k]).twin as int
+            // edge(edge_half_edges[e]) == e for all e
+            &&& forall|e: int| 0 <= e < edge_half_edges@.len() ==>
+                (#[trigger] half_edges@[edge_half_edges@[e] as int]).edge as int == e
+        },
+{
+    let hcnt = half_edges.len();
+    let ecnt = edge_half_edges.len();
+
+    // Check edge(edge_half_edges[e]) == e for all e
+    let mut e_check: usize = 0;
+    while e_check < ecnt
+        invariant
+            half_edges@.len() == hcnt,
+            edge_half_edges@.len() == ecnt,
+            0 <= e_check <= ecnt,
+            forall|e: int| 0 <= e < ecnt as int ==>
+                (#[trigger] edge_half_edges@[e] as int) < hcnt as int,
+            forall|e: int| 0 <= e < e_check as int ==>
+                (#[trigger] half_edges@[edge_half_edges@[e] as int]).edge as int == e,
+    {
+        let rep = edge_half_edges[e_check];
+        if half_edges[rep].edge != e_check {
+            return Err(MeshBuildError::Overflow);
+        }
+        e_check += 1;
+    }
+
+    let mut check: usize = 0;
+    while check < hcnt
+        invariant
+            half_edges@.len() == hcnt,
+            edge_half_edges@.len() == ecnt,
+            0 <= check <= hcnt,
+            forall|k: int| 0 <= k < hcnt as int ==>
+                ((#[trigger] half_edges@[k]).twin as int) < (hcnt as int),
+            forall|k: int| 0 <= k < hcnt as int ==>
+                ((#[trigger] half_edges@[k]).edge as int) < ecnt as int,
+            forall|e: int| 0 <= e < ecnt as int ==>
+                (#[trigger] edge_half_edges@[e] as int) < hcnt as int,
+            forall|k: int| 0 <= k < check as int ==>
+                (#[trigger] half_edges@[k]).edge
+                    == half_edges@[half_edges@[k].twin as int].edge,
+            forall|k: int| 0 <= k < check as int ==> {
+                let e = (#[trigger] half_edges@[k]).edge as int;
+                let t = half_edges@[k].twin as int;
+                (edge_half_edges@[e] as int == k || edge_half_edges@[e] as int == t)
+            },
+            forall|k: int| 0 <= k < check as int ==>
+                k != (#[trigger] half_edges@[k]).twin as int,
+    {
+        let t = half_edges[check].twin;
+        if half_edges[check].edge != half_edges[t].edge {
+            return Err(MeshBuildError::Overflow);
+        }
+        let e = half_edges[check].edge;
+        if edge_half_edges[e] != check && edge_half_edges[e] != t {
+            return Err(MeshBuildError::Overflow);
+        }
+        if t == check {
+            return Err(MeshBuildError::Overflow);
+        }
+        check += 1;
+    }
+    Ok(())
+}
+
+/// Prove edge_exactly_two_half_edges from verified edge properties.
+proof fn lemma_edge_exactly_two_from_properties(mesh: &Mesh)
+    requires
+        // twin involution
+        forall|h: int| 0 <= h < half_edge_count(mesh) ==>
+            (#[trigger] mesh.half_edges@[mesh.half_edges@[h].twin as int].twin as int) == h,
+        // All twins valid
+        forall|h: int| 0 <= h < half_edge_count(mesh) ==>
+            ((#[trigger] mesh.half_edges@[h]).twin as int) < half_edge_count(mesh),
+        // edge(h) == edge(twin(h))
+        forall|k: int| 0 <= k < half_edge_count(mesh) ==>
+            (#[trigger] mesh.half_edges@[k]).edge
+                == mesh.half_edges@[mesh.half_edges@[k].twin as int].edge,
+        // edge_half_edges[edge(h)] is h or twin(h)
+        forall|k: int| 0 <= k < half_edge_count(mesh) ==> {
+            let e = (#[trigger] mesh.half_edges@[k]).edge as int;
+            let t = mesh.half_edges@[k].twin as int;
+            (mesh.edge_half_edges@[e] as int == k || mesh.edge_half_edges@[e] as int == t)
+        },
+        // h != twin(h)
+        forall|k: int| 0 <= k < half_edge_count(mesh) ==>
+            k != (#[trigger] mesh.half_edges@[k]).twin as int,
+        // All edges valid
+        forall|h: int| 0 <= h < half_edge_count(mesh) ==>
+            ((#[trigger] mesh.half_edges@[h]).edge as int) < edge_count(mesh),
+        // edge_half_edges valid
+        forall|e: int| 0 <= e < edge_count(mesh) ==>
+            (#[trigger] mesh.edge_half_edges@[e] as int) < half_edge_count(mesh),
+        // edge(edge_half_edges[e]) == e
+        forall|e: int| 0 <= e < edge_count(mesh) ==>
+            (#[trigger] mesh.half_edges@[mesh.edge_half_edges@[e] as int]).edge as int == e,
+    ensures
+        edge_exactly_two_half_edges(mesh),
+{
+    assert forall|e: int| 0 <= e < edge_count(mesh) implies
+        edge_exactly_two_half_edges_at(mesh, e)
+    by {
+        let h0 = mesh.edge_half_edges@[e] as int;
+        let h1 = mesh.half_edges@[h0].twin as int;
+
+        // h0 is in bounds and edge(h0) == e
+        assert(0 <= h0 < half_edge_count(mesh));
+        assert(mesh.half_edges@[h0].edge as int == e);
+
+        // h1 is in bounds (twin valid)
+        assert(0 <= h1 < half_edge_count(mesh));
+
+        // edge(h1) == e (edge(twin(h0)) == edge(h0) == e)
+        assert(mesh.half_edges@[h1].edge == mesh.half_edges@[h0].edge);
+
+        // h0 != h1
+        assert(h0 != h1);
+
+        // twin(h0) == h1 (by definition)
+        // twin(h1) == h0 (by twin involution)
+        assert(mesh.half_edges@[h0].twin as int == h1);
+        assert(mesh.half_edges@[h1].twin as int == h0);
+
+        // edge_half_edges[e] is h0 (by definition)
+        assert(mesh.edge_half_edges@[e] as int == h0);
+
+        // For all h with edge(h) == e: h == h0 or h == h1
+        // Uses: edge_half_edges[edge(h)] == h or twin(h)
+        // edge(h) == e, so edge_half_edges[e] == h or twin(h)
+        // edge_half_edges[e] == h0, so h == h0 or twin(h) == h0
+        // If twin(h) == h0, then h == twin(twin(h)) == twin(h0) == h1
+        assert forall|h: int|
+            0 <= h < half_edge_count(mesh)
+            && (#[trigger] mesh.half_edges@[h].edge as int) == e
+        implies h == h0 || h == h1
+        by {
+            // edge_half_edges[edge(h)] == h or twin(h)
+            // edge(h) == e, edge_half_edges[e] == h0
+            // So h0 == h or h0 == twin(h)
+            if mesh.edge_half_edges@[e] as int == h {
+                // h == h0
+            } else {
+                // h0 == twin(h), so h == twin(h0) == h1
+                assert(mesh.edge_half_edges@[e] as int == mesh.half_edges@[h].twin as int);
+                assert(mesh.half_edges@[h].twin as int == h0);
+                // twin(twin(h)) == h, twin(h) == h0, so twin(h0) == h
+                // But twin(h0) == h1, so h == h1
+            }
+        }
+    }
+}
+
 /// Phase D helper: create edges from twin pairs.
 /// Extracted to give Z3 a separate verification context.
 #[verifier::exec_allows_no_decreases_clause]
@@ -840,57 +1026,10 @@ pub fn from_face_cycles(
         return Err(MeshBuildError::Overflow);
     }
 
-    // Post-Phase-D: Verify edge properties for all h
-    let mut check2: usize = 0;
-    while check2 < hcnt
-        invariant
-            half_edges.len() == hcnt,
-            edge_half_edges.len() == ecnt,
-            0 <= check2 <= hcnt,
-            // All twins valid (from Phase C, preserved by Phase D)
-            forall|k: int| 0 <= k < hcnt as int ==>
-                ((#[trigger] half_edges@[k]).twin as int) < (hcnt as int),
-            // All edges valid
-            forall|k: int| 0 <= k < hcnt as int ==>
-                ((#[trigger] half_edges@[k]).edge as int) < ecnt as int,
-            // edge_half_edges valid
-            forall|e: int| 0 <= e < ecnt as int ==>
-                (#[trigger] edge_half_edges@[e] as int) < hcnt as int,
-            // Edge(h) == edge(twin(h)) for all checked
-            forall|k: int| 0 <= k < check2 as int ==>
-                (#[trigger] half_edges@[k]).edge
-                    == half_edges@[half_edges@[k].twin as int].edge,
-            // edge_half_edges[edge(h)] is h or twin(h) for all checked
-            forall|k: int| 0 <= k < check2 as int ==> {
-                let e = (#[trigger] half_edges@[k]).edge as int;
-                let t = half_edges@[k].twin as int;
-                (edge_half_edges@[e] as int == k || edge_half_edges@[e] as int == t)
-            },
-            // h != twin(h) for all checked
-            forall|k: int| 0 <= k < check2 as int ==>
-                k != (#[trigger] half_edges@[k]).twin as int,
-    {
-        let t = half_edges[check2].twin;
-        if half_edges[check2].edge != half_edges[t].edge {
-            return Err(MeshBuildError::Overflow);
-        }
-        let e = half_edges[check2].edge;
-        if edge_half_edges[e] != check2 && edge_half_edges[e] != t {
-            return Err(MeshBuildError::Overflow);
-        }
-        if t == check2 {
-            return Err(MeshBuildError::Overflow);
-        }
-        check2 += 1;
-    }
-
-    // Post-Phase-D: Verify 2 * edge_count == half_edge_count
-    let ecnt = edge_half_edges.len();
-    if ecnt > usize::MAX / 2 {
-        return Err(MeshBuildError::Overflow);
-    }
-    if 2 * ecnt != hcnt {
-        return Err(MeshBuildError::Overflow);
+    // Post-Phase-D: Verify edge properties (extracted to helper for Z3)
+    match verify_edge_properties(&half_edges, &edge_half_edges) {
+        Ok(()) => {},
+        Err(e) => return Err(e),
     }
 
     // Phase E: Vertex representatives + validate
@@ -1063,6 +1202,10 @@ pub fn from_face_cycles(
         // Derive index_bounds via helper lemma (avoids rlimit)
         lemma_index_bounds_from_construction(&mesh, post_phase_b, pre_phase_d);
         assert(index_bounds(&mesh));
+
+        // Derive edge_exactly_two_half_edges
+        lemma_edge_exactly_two_from_properties(&mesh);
+        assert(edge_exactly_two_half_edges(&mesh));
 
         // Derive half_edge_edge_count_relation (from post-Phase-D counting check)
         assert(2 * edge_count(&mesh) == half_edge_count(&mesh));

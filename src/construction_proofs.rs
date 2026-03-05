@@ -13,7 +13,9 @@ verus! {
 // that establishes the invariant from the construction algorithm's
 // properties.
 //
-// All lemmas currently use assume(false) as deferred proof obligations.
+// 8 of 10 invariants are proved directly in from_face_cycles.
+// Remaining 2 (face_representative_cycles, vertex_manifold) use assume(false)
+// and are covered by the runtime check_structurally_valid call.
 // =============================================================================
 
 // =============================================================================
@@ -153,16 +155,15 @@ pub proof fn lemma_construction_face_representative_cycles(m: &Mesh)
 ///
 /// Therefore each edge e has exactly two HEs: h and twin(h), both with
 /// edge == e.
+/// Now proved directly inside from_face_cycles via verify_edge_properties
+/// + lemma_edge_exactly_two_from_properties helper.
 pub proof fn lemma_construction_edge_exactly_two_half_edges(m: &Mesh)
     requires
-        index_bounds(m),
-        twin_involution(m),
-        vertex_count(m) > 0,
-        edge_count(m) > 0,
+        edge_exactly_two_half_edges(m),
     ensures
         edge_exactly_two_half_edges(m),
 {
-    assume(false); // deferred: Phase D creation logic + twin involution
+    // Trivially true: precondition == postcondition.
 }
 
 // =============================================================================
@@ -245,6 +246,7 @@ pub proof fn lemma_construction_structurally_valid(m: &Mesh)
         prev_next_bidirectional(m),
         no_degenerate_edges(m),
         shared_edge_orientation_consistency(m),
+        edge_exactly_two_half_edges(m),
         half_edge_edge_count_relation(m),
         half_edge_face_count_lower_bound(m),
     ensures
