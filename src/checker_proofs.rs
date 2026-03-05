@@ -411,7 +411,6 @@ pub(crate) proof fn lemma_vertex_ring_step(
         0 <= start < hcnt,
         0 <= h_prev < hcnt,
         0 <= steps_prev,
-        steps_prev < hcnt,
         h_prev == vertex_ring_iter(m, start, steps_prev as nat),
         !local_seen_before[h_prev],
         m.half_edges@[h_prev].vertex as int == v,

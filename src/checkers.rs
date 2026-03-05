@@ -576,6 +576,7 @@ pub fn check_face_cycles(m: &Mesh) -> (out: bool)
                 0 <= steps <= hcnt,
                 global_seen@.len() == hcnt as int,
                 local_seen@.len() == hcnt as int,
+                global_seen_before.len() == hcnt as int,
                 start < hcnt,
                 0 <= h < hcnt,
                 h as int == next_iter(m, start as int, steps as nat),
@@ -635,6 +636,9 @@ pub fn check_face_cycles(m: &Mesh) -> (out: bool)
 
             proof {
                 assert(0 <= h_prev as int && (h_prev as int) < local_seen_before.len());
+                assert(local_seen_before.len() == hcnt as int);
+                assert(global_seen_before.len() == hcnt as int);
+                assert(global_seen_before_iter.len() == hcnt as int);
                 assert(local_seen@ == local_seen_before.update(h_prev as int, true));
                 assert(global_seen@ == global_seen_before_iter.update(h_prev as int, true));
                 lemma_face_cycle_step(
