@@ -233,6 +233,30 @@ pub proof fn lemma_construction_vertex_manifold(m: &Mesh)
 // Composite: all invariants together
 // =============================================================================
 
+/// 2 * edge_count == half_edge_count follows from edge_exactly_two_half_edges.
+pub proof fn lemma_construction_half_edge_edge_count_relation(m: &Mesh)
+    requires
+        index_bounds(m),
+        edge_exactly_two_half_edges(m),
+        edge_count(m) > 0,
+    ensures
+        half_edge_edge_count_relation(m),
+{
+    assume(false); // deferred: counting argument from edge_exactly_two_half_edges
+}
+
+/// half_edge_count >= 3 * face_count follows from face cycles covering all HEs.
+pub proof fn lemma_construction_half_edge_face_count_lower_bound(m: &Mesh)
+    requires
+        index_bounds(m),
+        face_representative_cycles_cover_all_half_edges(m),
+        face_count(m) > 0,
+    ensures
+        half_edge_face_count_lower_bound(m),
+{
+    assume(false); // deferred: counting argument from face cycle coverage
+}
+
 /// Wire all construction proofs together to prove structurally_valid.
 pub proof fn lemma_construction_structurally_valid(m: &Mesh)
     requires
@@ -252,6 +276,8 @@ pub proof fn lemma_construction_structurally_valid(m: &Mesh)
     lemma_construction_face_representative_cycles(m);
     lemma_construction_edge_exactly_two_half_edges(m);
     lemma_construction_vertex_manifold(m);
+    lemma_construction_half_edge_edge_count_relation(m);
+    lemma_construction_half_edge_face_count_lower_bound(m);
 }
 
 // =============================================================================
@@ -390,26 +416,26 @@ pub proof fn lemma_vertex_ring_unique_period(m: &Mesh, v: int, k1: nat, k2: nat)
     }
 }
 
-/// Half-edge count equals sum of face cycle lengths.
+/// Half-edge count >= 3 * face_count.
+/// Now follows directly from half_edge_face_count_lower_bound in structurally_valid.
 pub proof fn lemma_half_edge_count_sum_of_face_degrees(m: &Mesh)
     requires
         structurally_valid(m),
     ensures
-        // Each face cycle contributes its degree number of HEs,
-        // and all HEs are covered by exactly one face cycle.
         half_edge_count(m) >= 3 * face_count(m),
 {
-    assume(false); // deferred: face cycle cover + minimum face size 3
+    // half_edge_face_count_lower_bound is a conjunct of structurally_valid
 }
 
 /// Edge count equals half of half-edge count.
+/// Now follows directly from half_edge_edge_count_relation in structurally_valid.
 pub proof fn lemma_edge_count_half_of_half_edge_count(m: &Mesh)
     requires
         structurally_valid(m),
     ensures
         2 * edge_count(m) == half_edge_count(m),
 {
-    assume(false); // deferred: each edge has exactly 2 HEs
+    // half_edge_edge_count_relation is a conjunct of structurally_valid
 }
 
 /// Vertex degree equals the vertex ring length.

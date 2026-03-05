@@ -133,43 +133,23 @@ fn set_he_face(half_edges: &mut Vec<HalfEdge>, idx: usize, val: usize)
 // 5.1 split_edge
 // =============================================================================
 
-/// Insert new vertex on edge e. +1V, +1E, +2HE, 0F.
-///
-/// Before:
-///   h0: v0 ---> v1   (face f0)
-///   h1: v1 ---> v0   (face f1, twin of h0)
-///
-/// After:
-///   h0: v0 ---> v_new (face f0)
-///   h2: v_new ---> v1 (face f0, new HE)
-///   h1: v1 ---> v_new (face f1)  [vertex unchanged, but now points to v_new via next]
-///   h3: v_new ---> v0 (face f1, new HE)
-///
-/// New vertex v_new, new edge e_new (for h2/h3 pair).
-/// h0/h1 keep edge e. h0.next -> h2 -> old_h0_next. h1.next -> h3 -> old_h1_next.
-pub fn split_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
+/// Helper: perform the split_edge mutation and return the new mesh.
+/// Only ensures count postconditions; structurally_valid checked at call site.
+fn split_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
     requires
-        structurally_valid(&mesh),
+        index_bounds(&mesh),
         0 <= e < edge_count(&mesh) as int,
+        vertex_count(&mesh) < usize::MAX - 1,
+        edge_count(&mesh) < usize::MAX - 1,
+        half_edge_count(&mesh) < usize::MAX - 2,
     ensures
-        result is Ok ==> structurally_valid(&result->Ok_0),
-        result is Ok ==> vertex_count(&result->Ok_0) == vertex_count(&mesh) + 1,
-        result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh) + 1,
-        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh),
+        vertex_count(&result_mesh) == vertex_count(&mesh) + 1,
+        edge_count(&result_mesh) == edge_count(&mesh) + 1,
+        face_count(&result_mesh) == face_count(&mesh),
 {
-    proof {
-        assume(false); // deferred: rlimit exceeded without this
-    }
-
     let vcnt = mesh.vertex_half_edges.len();
     let ecnt = mesh.edge_half_edges.len();
-    let fcnt = mesh.face_half_edges.len();
     let hcnt = mesh.half_edges.len();
-
-    // Overflow checks
-    if vcnt >= usize::MAX - 1 || ecnt >= usize::MAX - 1 || hcnt >= usize::MAX - 2 {
-        return Err(EulerError::Overflow);
-    }
 
     let h0 = mesh.edge_half_edges[e];
     let h1 = mesh.half_edges[h0].twin;
@@ -182,51 +162,68 @@ pub fn split_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     let old_h0_next = mesh.half_edges[h0].next;
     let old_h1_next = mesh.half_edges[h1].next;
 
-    // New indices
     let v_new = vcnt;
     let e_new = ecnt;
-    let h2 = hcnt;       // new HE in f0: v_new -> v1
-    let h3 = hcnt + 1;   // new HE in f1: v_new -> v0
+    let h2 = hcnt;
+    let h3 = hcnt + 1;
 
-    // Build new half_edges vector
     let mut half_edges = mesh.half_edges;
 
-    // h0.next = h2, h0 keeps its edge
     set_he_next(&mut half_edges, h0, h2);
-
-    // h1.next = h3, h1 keeps its edge
     set_he_next(&mut half_edges, h1, h3);
-
-    // old_h0_next.prev = h2
     set_he_prev(&mut half_edges, old_h0_next, h2);
-
-    // old_h1_next.prev = h3
     set_he_prev(&mut half_edges, old_h1_next, h3);
 
-    // h2: twin=h1, next=old_h0_next, prev=h0, vertex=v_new, edge=e_new, face=f0
     half_edges.push(HalfEdge { twin: h1, next: old_h0_next, prev: h0, vertex: v_new, edge: e_new, face: f0 });
-
-    // h3: twin=h0, next=old_h1_next, prev=h1, vertex=v_new, edge=e_new, face=f1
     half_edges.push(HalfEdge { twin: h0, next: old_h1_next, prev: h1, vertex: v_new, edge: e_new, face: f1 });
 
-    // Fix twins: h0.twin = h3, h1.twin = h2
     set_he_twin(&mut half_edges, h0, h3);
     set_he_twin(&mut half_edges, h1, h2);
 
-    // Build vertex_half_edges
     let mut vertex_half_edges = mesh.vertex_half_edges;
-    vertex_half_edges.push(h2);  // v_new points to h2
+    vertex_half_edges.push(h2);
 
-    // Build edge_half_edges
     let mut edge_half_edges = mesh.edge_half_edges;
-    edge_half_edges.push(h2);    // e_new points to h2
+    edge_half_edges.push(h2);
 
-    let result_mesh = Mesh {
+    Mesh {
         vertex_half_edges,
         edge_half_edges,
         face_half_edges: mesh.face_half_edges,
         half_edges,
-    };
+    }
+}
+
+/// Insert new vertex on edge e. +1V, +1E, +2HE, 0F.
+///
+/// Before:
+///   h0: v0 ---> v1   (face f0)
+///   h1: v1 ---> v0   (face f1, twin of h0)
+///
+/// After:
+///   h0: v0 ---> v_new (face f0)
+///   h2: v_new ---> v1 (face f0, new HE)
+///   h1: v1 ---> v_new (face f1)
+///   h3: v_new ---> v0 (face f1, new HE)
+pub fn split_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
+        0 <= e < edge_count(&mesh) as int,
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+        result is Ok ==> vertex_count(&result->Ok_0) == vertex_count(&mesh) + 1,
+        result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh) + 1,
+        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh),
+{
+    let vcnt = mesh.vertex_half_edges.len();
+    let ecnt = mesh.edge_half_edges.len();
+    let hcnt = mesh.half_edges.len();
+
+    if vcnt >= usize::MAX - 1 || ecnt >= usize::MAX - 1 || hcnt >= usize::MAX - 2 {
+        return Err(EulerError::Overflow);
+    }
+
+    let result_mesh = split_edge_build(mesh, e);
 
     if check_structurally_valid(&result_mesh) {
         Ok(result_mesh)
@@ -239,49 +236,31 @@ pub fn split_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
 // 5.2 split_face
 // =============================================================================
 
-/// Add edge between two non-adjacent vertices on a face boundary.
-/// 0V, +1E, +1F, +2HE.
-///
-/// h_start and h_end must be on the same face and not adjacent.
-/// Creates a new edge from vertex(h_start) to vertex(h_end),
-/// splitting the face into two.
-pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<Mesh, EulerError>)
+/// Helper: perform the split_face mutation and return the new mesh.
+fn split_face_build(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<Mesh, EulerError>)
     requires
-        structurally_valid(&mesh),
+        index_bounds(&mesh),
         0 <= h_start < half_edge_count(&mesh) as int,
         0 <= h_end < half_edge_count(&mesh) as int,
+        edge_count(&mesh) < usize::MAX - 1,
+        face_count(&mesh) < usize::MAX - 1,
+        half_edge_count(&mesh) < usize::MAX - 2,
     ensures
-        result is Ok ==> structurally_valid(&result->Ok_0),
         result is Ok ==> vertex_count(&result->Ok_0) == vertex_count(&mesh),
-        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh) + 1,
         result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh) + 1,
+        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh) + 1,
 {
-    proof {
-        assume(false); // deferred: split_face correctness proved by runtime check_structurally_valid
-    }
-
-    let vcnt = mesh.vertex_half_edges.len();
     let ecnt = mesh.edge_half_edges.len();
     let fcnt = mesh.face_half_edges.len();
     let hcnt = mesh.half_edges.len();
 
-    // Overflow checks
-    if ecnt >= usize::MAX - 1 || fcnt >= usize::MAX - 1 || hcnt >= usize::MAX - 2 {
-        return Err(EulerError::Overflow);
-    }
-
-    // Check same face
     let f_old = mesh.half_edges[h_start].face;
     if mesh.half_edges[h_end].face != f_old {
         return Err(EulerError::InvalidIndex);
     }
-
-    // Check not adjacent (h_start.next != h_end and h_end.next != h_start)
     if mesh.half_edges[h_start].next == h_end || mesh.half_edges[h_end].next == h_start {
         return Err(EulerError::WouldCreateDegeneracy);
     }
-
-    // Check not the same
     if h_start == h_end {
         return Err(EulerError::WouldCreateDegeneracy);
     }
@@ -289,20 +268,16 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
     let v_start = mesh.half_edges[h_start].vertex;
     let v_end = mesh.half_edges[h_end].vertex;
 
-    // New indices
     let e_new = ecnt;
     let f_new = fcnt;
-    let h_new_a = hcnt;      // new HE: v_start -> v_end (stays in f_old)
-    let h_new_b = hcnt + 1;  // new HE: v_end -> v_start (goes to f_new)
+    let h_new_a = hcnt;
+    let h_new_b = hcnt + 1;
 
     let prev_of_h_start = mesh.half_edges[h_start].prev;
     let prev_of_h_end = mesh.half_edges[h_end].prev;
 
     let mut half_edges = mesh.half_edges;
 
-    // h_new_a: from v_start to v_end, in f_old
-    // next = h_end, prev = prev_of_h_start (which was the last HE before h_start)
-    // Actually: h_new_a sits between prev_of_h_start and h_end in f_old's cycle
     half_edges.push(HalfEdge {
         twin: h_new_b,
         next: h_end,
@@ -312,8 +287,6 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
         face: f_old,
     });
 
-    // h_new_b: from v_end to v_start, in f_new
-    // next = h_start, prev = prev_of_h_end
     half_edges.push(HalfEdge {
         twin: h_new_a,
         next: h_start,
@@ -323,20 +296,11 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
         face: f_new,
     });
 
-    // Relink: prev_of_h_start.next = h_new_a (was h_start)
     set_he_next(&mut half_edges, prev_of_h_start, h_new_a);
-
-    // Relink: h_end.prev = h_new_a (was prev_of_h_end)
     set_he_prev(&mut half_edges, h_end, h_new_a);
-
-    // Relink: prev_of_h_end.next = h_new_b (was h_end)
     set_he_next(&mut half_edges, prev_of_h_end, h_new_b);
-
-    // Relink: h_start.prev = h_new_b (was prev_of_h_start)
     set_he_prev(&mut half_edges, h_start, h_new_b);
 
-    // Update face assignments: walk from h_new_b through f_new's cycle
-    // All HEs from h_start to prev_of_h_end (inclusive) belong to f_new
     {
         let new_hcnt = hcnt + 2;
         let mut cur = h_start;
@@ -358,28 +322,51 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
         }
     }
 
-    // Build edge_half_edges
     let mut edge_half_edges = mesh.edge_half_edges;
     edge_half_edges.push(h_new_a);
 
-    // Build face_half_edges
     let mut face_half_edges = mesh.face_half_edges;
-    // f_old now points to h_new_a (guaranteed to be in f_old)
     face_half_edges.set(f_old, h_new_a);
-    // f_new points to h_new_b
     face_half_edges.push(h_new_b);
 
-    let result_mesh = Mesh {
+    Ok(Mesh {
         vertex_half_edges: mesh.vertex_half_edges,
         edge_half_edges,
         face_half_edges,
         half_edges,
-    };
+    })
+}
 
-    if check_structurally_valid(&result_mesh) {
-        Ok(result_mesh)
-    } else {
-        Err(EulerError::ValidationFailed)
+/// Add edge between two non-adjacent vertices on a face boundary.
+/// 0V, +1E, +1F, +2HE.
+pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
+        0 <= h_start < half_edge_count(&mesh) as int,
+        0 <= h_end < half_edge_count(&mesh) as int,
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+        result is Ok ==> vertex_count(&result->Ok_0) == vertex_count(&mesh),
+        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh) + 1,
+        result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh) + 1,
+{
+    let ecnt = mesh.edge_half_edges.len();
+    let fcnt = mesh.face_half_edges.len();
+    let hcnt = mesh.half_edges.len();
+
+    if ecnt >= usize::MAX - 1 || fcnt >= usize::MAX - 1 || hcnt >= usize::MAX - 2 {
+        return Err(EulerError::Overflow);
+    }
+
+    match split_face_build(mesh, h_start, h_end) {
+        Ok(result_mesh) => {
+            if check_structurally_valid(&result_mesh) {
+                Ok(result_mesh)
+            } else {
+                Err(EulerError::ValidationFailed)
+            }
+        }
+        Err(err) => Err(err),
     }
 }
 
@@ -398,11 +385,70 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
 ///    \ /               \|/
 ///     a                 a
 ///
-/// h0: a->b (f0), h1: b->a (f1, twin of h0)
-/// After flip: h0: d->c (f0), h1: c->d (f1)
+/// Helper: perform the flip_edge mutation and return the new mesh.
+fn flip_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
+    requires
+        index_bounds(&mesh),
+        0 <= e < edge_count(&mesh) as int,
+    ensures
+        vertex_count(&result_mesh) == vertex_count(&mesh),
+        edge_count(&result_mesh) == edge_count(&mesh),
+        face_count(&result_mesh) == face_count(&mesh),
+{
+    let h0 = mesh.edge_half_edges[e];
+    let h1 = mesh.half_edges[h0].twin;
+
+    let f0 = mesh.half_edges[h0].face;
+    let f1 = mesh.half_edges[h1].face;
+
+    let a = mesh.half_edges[h0].next;
+    let b = mesh.half_edges[a].next;
+    let c = mesh.half_edges[h1].next;
+    let d = mesh.half_edges[c].next;
+
+    let v_b = mesh.half_edges[b].vertex;
+    let v_d = mesh.half_edges[d].vertex;
+    let edge_idx = mesh.half_edges[h0].edge;
+
+    let mut half_edges = mesh.half_edges;
+
+    half_edges.set(h0, HalfEdge { twin: h1, next: b, prev: c, vertex: v_d, edge: edge_idx, face: f0 });
+    half_edges.set(h1, HalfEdge { twin: h0, next: d, prev: a, vertex: v_b, edge: edge_idx, face: f1 });
+
+    set_he_prev(&mut half_edges, b, h0);
+    set_he_next(&mut half_edges, b, c);
+
+    set_he_prev(&mut half_edges, c, b);
+    set_he_next(&mut half_edges, c, h0);
+    set_he_face(&mut half_edges, c, f0);
+
+    set_he_prev(&mut half_edges, d, h1);
+    set_he_next(&mut half_edges, d, a);
+
+    set_he_prev(&mut half_edges, a, d);
+    set_he_next(&mut half_edges, a, h1);
+    set_he_face(&mut half_edges, a, f1);
+
+    let mut face_half_edges = mesh.face_half_edges;
+    face_half_edges.set(f0, h0);
+    face_half_edges.set(f1, h1);
+
+    let mut vertex_half_edges = mesh.vertex_half_edges;
+    vertex_half_edges.set(v_d, h0);
+    vertex_half_edges.set(v_b, h1);
+
+    Mesh {
+        vertex_half_edges,
+        edge_half_edges: mesh.edge_half_edges,
+        face_half_edges,
+        half_edges,
+    }
+}
+
+/// Rotate edge 90° within quad formed by two adjacent triangles. 0V, 0E, 0F.
 pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     requires
-        structurally_valid(&mesh),
+        index_bounds(&mesh),
         0 <= e < edge_count(&mesh) as int,
     ensures
         result is Ok ==> structurally_valid(&result->Ok_0),
@@ -410,25 +456,15 @@ pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh),
         result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh),
 {
-    proof {
-        assume(false); // deferred: flip_edge correctness proved by runtime check_structurally_valid
-    }
-
-    let hcnt = mesh.half_edges.len();
-
     let h0 = mesh.edge_half_edges[e];
     let h1 = mesh.half_edges[h0].twin;
-
     let f0 = mesh.half_edges[h0].face;
     let f1 = mesh.half_edges[h1].face;
+    let a = mesh.half_edges[h0].next;
+    let b = mesh.half_edges[a].next;
+    let c = mesh.half_edges[h1].next;
+    let d = mesh.half_edges[c].next;
 
-    // Get the surrounding half-edges
-    let a = mesh.half_edges[h0].next;  // h0.next
-    let b = mesh.half_edges[a].next;   // h0.next.next
-    let c = mesh.half_edges[h1].next;  // h1.next
-    let d = mesh.half_edges[c].next;   // h1.next.next
-
-    // Check both faces are triangles (degree 3 means next.next.next == self)
     if mesh.half_edges[b].next != h0 {
         return Err(EulerError::NotTriangleFace { face: f0 });
     }
@@ -436,67 +472,7 @@ pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         return Err(EulerError::NotTriangleFace { face: f1 });
     }
 
-    // Vertices: h0 goes from vertex(h0) to vertex(a) (i.e., a->b originally)
-    // After flip: h0 from vertex(b) to vertex(d), h1 from vertex(d) to vertex(b)
-    let v_b = mesh.half_edges[b].vertex;   // opposite vertex in f0
-    let v_d = mesh.half_edges[d].vertex;   // opposite vertex in f1
-    let edge_idx = mesh.half_edges[h0].edge;
-
-    let mut half_edges = mesh.half_edges;
-
-    // Rewrite h0: vertex=v_b, next=b's-next=d? No...
-    // New f0 triangle: h0(v_b->v_d), a, d  -- no wait, let me think again
-    //
-    // Original f0: h0 -> a -> b -> h0
-    // Original f1: h1 -> c -> d -> h1
-    //
-    // After flip, the new edge connects v_b and v_d:
-    // New f0: h0(v_d -> v_b), b, c  -- h0 now goes from v_d to v_b
-    //   h0.next = b, b.next = c, c.next = h0
-    // New f1: h1(v_b -> v_d), d, a  -- h1 now goes from v_b to v_d
-    //   h1.next = d, d.next = a, a.next = h1
-
-    // h0: vertex = v_d, next = b, prev = c
-    half_edges.set(h0, HalfEdge { twin: h1, next: b, prev: c, vertex: v_d, edge: edge_idx, face: f0 });
-
-    // h1: vertex = v_b, next = d, prev = a
-    half_edges.set(h1, HalfEdge { twin: h0, next: d, prev: a, vertex: v_b, edge: edge_idx, face: f1 });
-
-    // b: prev = h0, next = c, face = f0 (already in f0)
-    set_he_prev(&mut half_edges, b, h0);
-    set_he_next(&mut half_edges, b, c);
-
-    // c: prev = b, next = h0, face = f0 (was in f1!)
-    set_he_prev(&mut half_edges, c, b);
-    set_he_next(&mut half_edges, c, h0);
-    set_he_face(&mut half_edges, c, f0);
-
-    // d: prev = h1, next = a, face = f1 (already in f1)
-    set_he_prev(&mut half_edges, d, h1);
-    set_he_next(&mut half_edges, d, a);
-
-    // a: prev = d, next = h1, face = f1 (was in f0!)
-    set_he_prev(&mut half_edges, a, d);
-    set_he_next(&mut half_edges, a, h1);
-    set_he_face(&mut half_edges, a, f1);
-
-    // Update face representatives
-    let mut face_half_edges = mesh.face_half_edges;
-    face_half_edges.set(f0, h0);
-    face_half_edges.set(f1, h1);
-
-    // Update vertex representatives
-    // h0.vertex = v_d now, h1.vertex = v_b now
-    let mut vertex_half_edges = mesh.vertex_half_edges;
-    vertex_half_edges.set(v_d, h0);
-    vertex_half_edges.set(v_b, h1);
-
-    let result_mesh = Mesh {
-        vertex_half_edges,
-        edge_half_edges: mesh.edge_half_edges,
-        face_half_edges,
-        half_edges,
-    };
+    let result_mesh = flip_edge_build(mesh, e);
 
     if check_structurally_valid(&result_mesh) {
         Ok(result_mesh)
@@ -509,24 +485,14 @@ pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
 // 5.4 collapse_edge
 // =============================================================================
 
-/// Merge two endpoints of edge e into one vertex.
-/// For triangle-adjacent case: −1V, −3E, −2F, −6HE.
-///
-/// This is the most complex operator. We merge v1 into v0,
-/// remove the two degenerate triangles adjacent to the edge,
-/// and compact all indices.
+/// Helper: perform the collapse_edge mutation and return the mesh.
+/// All validation and compaction logic; structural validity checked by caller.
 #[verifier::exec_allows_no_decreases_clause]
-pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
+fn collapse_edge_build(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     requires
-        structurally_valid(&mesh),
+        index_bounds(&mesh),
         0 <= e < edge_count(&mesh) as int,
-    ensures
-        result is Ok ==> structurally_valid(&result->Ok_0),
 {
-    proof {
-        assume(false); // deferred: collapse_edge correctness proved by runtime check_structurally_valid
-    }
-
     let vcnt = mesh.vertex_half_edges.len();
     let ecnt = mesh.edge_half_edges.len();
     let fcnt = mesh.face_half_edges.len();
@@ -545,7 +511,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     let f0 = mesh.half_edges[h0].face;
     let f1 = mesh.half_edges[h1].face;
 
-    // Check both adjacent faces are triangles
     let a0 = mesh.half_edges[h0].next;
     let b0 = mesh.half_edges[a0].next;
     if mesh.half_edges[b0].next != h0 {
@@ -558,23 +523,25 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         return Err(EulerError::NotTriangleFace { face: f1 });
     }
 
-    // Save values before destructuring mesh
     let e_a0 = mesh.half_edges[a0].edge;
     let e_a1 = mesh.half_edges[a1].edge;
 
-    // Destructure mesh to get ownership of all fields
     let old_vertex_half_edges = mesh.vertex_half_edges;
     let old_edge_half_edges = mesh.edge_half_edges;
     let old_face_half_edges = mesh.face_half_edges;
 
-    // Step 1: Take half-edges and rewrite v1 -> v0
     let mut half_edges = mesh.half_edges;
+    let ghost orig = half_edges@;
 
     let mut i: usize = 0;
     while i < hcnt
         invariant
             half_edges.len() == hcnt,
             0 <= i <= hcnt,
+            forall|h: int| 0 <= h < hcnt ==> {
+                &&& (#[trigger] half_edges@[h]).twin == orig[h].twin
+                &&& half_edges@[h].edge == orig[h].edge
+            },
     {
         if half_edges[i].vertex == v1 {
             set_he_vertex(&mut half_edges, i, v0);
@@ -582,18 +549,14 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         i = i + 1;
     }
 
-    // Step 2: Remove degenerate faces f0 and f1
-    // For f0: a0.twin and b0.twin should become twins of each other
     let a0_twin = half_edges[a0].twin;
     let b0_twin = half_edges[b0].twin;
     set_he_twin(&mut half_edges, a0_twin, b0_twin);
     set_he_twin(&mut half_edges, b0_twin, a0_twin);
 
-    // Merge edges: a0_twin and b0_twin now share an edge
     let kept_edge_0 = half_edges[a0_twin].edge;
     set_he_edge(&mut half_edges, b0_twin, kept_edge_0);
 
-    // For f1: a1.twin and b1.twin should become twins of each other
     let a1_twin = half_edges[a1].twin;
     let b1_twin = half_edges[b1].twin;
     set_he_twin(&mut half_edges, a1_twin, b1_twin);
@@ -602,17 +565,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     let kept_edge_1 = half_edges[a1_twin].edge;
     set_he_edge(&mut half_edges, b1_twin, kept_edge_1);
 
-    // Step 3: Mark removed HEs, then compact
-    // Removed HEs: h0, h1, a0, b0, a1, b1
-    // Removed faces: f0, f1
-    // Removed vertex: v1
-    // Removed edges: e, edge(a0), edge(a1) — 3 edges removed
-
-    // Build keep/remove maps and compact
-    // This is complex index remapping. For correctness we rely on check_structurally_valid.
-
-    // For simplicity, rebuild via from_face_cycles approach:
-    // Mark which HEs to keep
     let mut he_keep: Vec<bool> = Vec::new();
     let mut j: usize = 0;
     while j < hcnt
@@ -630,7 +582,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     he_keep.set(a1, false);
     he_keep.set(b1, false);
 
-    // Build old->new index map for HEs
     let new_hcnt = hcnt - 6;
     let mut he_old_to_new: Vec<usize> = Vec::new();
     let mut new_idx: usize = 0;
@@ -646,12 +597,11 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
             he_old_to_new.push(new_idx);
             new_idx = new_idx + 1;
         } else {
-            he_old_to_new.push(usize::MAX); // sentinel
+            he_old_to_new.push(usize::MAX);
         }
         k = k + 1;
     }
 
-    // Build new half_edges vector with remapped indices
     let mut new_half_edges: Vec<HalfEdge> = Vec::new();
     let mut k2: usize = 0;
     while k2 < hcnt
@@ -669,9 +619,7 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
             let new_twin = he_old_to_new[he.twin];
             let new_next = he_old_to_new[he.next];
             let new_prev = he_old_to_new[he.prev];
-            // Remap vertex: v1 already rewritten to v0, but need to compact v1 away
             let new_v = if he.vertex > v1 && v1 < he.vertex { he.vertex - 1 } else { he.vertex };
-            // Remap face: remove f0 and f1
             let smaller_f = if f0 < f1 { f0 } else { f1 };
             let larger_f = if f0 < f1 { f1 } else { f0 };
             let new_f = if he.face > larger_f && he.face >= 2 {
@@ -681,10 +629,7 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
             } else {
                 he.face
             };
-            // Remap edge: remove 3 edges (e, edge of a0, edge of a1)
-            // Sort the 3 removed edges
             let mut removed_edges: [usize; 3] = [e, e_a0, e_a1];
-            // Simple sort of 3 elements
             if removed_edges[0] > removed_edges[1] {
                 let tmp = removed_edges[0];
                 removed_edges[0] = removed_edges[1];
@@ -722,7 +667,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         k2 = k2 + 1;
     }
 
-    // Build new vertex_half_edges (remove v1)
     let new_vcnt = vcnt - 1;
     let mut new_vertex_half_edges: Vec<usize> = Vec::new();
     let mut vi: usize = 0;
@@ -739,11 +683,9 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
             if old_he >= hcnt {
                 return Err(EulerError::ValidationFailed);
             }
-            // If old representative was removed, pick first kept HE with this vertex
             if he_keep[old_he] {
                 new_vertex_half_edges.push(he_old_to_new[old_he]);
             } else {
-                // Find any kept HE with this (remapped) vertex
                 let remapped_v = new_vertex_half_edges.len();
                 let mut found: usize = usize::MAX;
                 let mut s: usize = 0;
@@ -769,7 +711,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         vi = vi + 1;
     }
 
-    // Build new edge_half_edges (remove 3 edges)
     let mut new_edge_half_edges: Vec<usize> = Vec::new();
     let mut ei: usize = 0;
     while ei < ecnt
@@ -788,7 +729,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
             if he_keep[old_he] {
                 new_edge_half_edges.push(he_old_to_new[old_he]);
             } else {
-                // Find twin which should be kept
                 let tw = half_edges[old_he].twin;
                 if tw >= hcnt {
                     return Err(EulerError::ValidationFailed);
@@ -803,7 +743,6 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         ei = ei + 1;
     }
 
-    // Build new face_half_edges (remove f0, f1)
     let mut new_face_half_edges: Vec<usize> = Vec::new();
     let mut fi: usize = 0;
     while fi < fcnt
@@ -827,17 +766,32 @@ pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         fi = fi + 1;
     }
 
-    let result_mesh = Mesh {
+    Ok(Mesh {
         vertex_half_edges: new_vertex_half_edges,
         edge_half_edges: new_edge_half_edges,
         face_half_edges: new_face_half_edges,
         half_edges: new_half_edges,
-    };
+    })
+}
 
-    if check_structurally_valid(&result_mesh) {
-        Ok(result_mesh)
-    } else {
-        Err(EulerError::ValidationFailed)
+/// Merge two endpoints of edge e into one vertex.
+/// For triangle-adjacent case: −1V, −3E, −2F, −6HE.
+pub fn collapse_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
+        0 <= e < edge_count(&mesh) as int,
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+{
+    match collapse_edge_build(mesh, e) {
+        Ok(result_mesh) => {
+            if check_structurally_valid(&result_mesh) {
+                Ok(result_mesh)
+            } else {
+                Err(EulerError::ValidationFailed)
+            }
+        }
+        Err(err) => Err(err),
     }
 }
 

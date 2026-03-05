@@ -2128,6 +2128,23 @@ pub fn check_structurally_valid(m: &Mesh) -> (out: bool)
     if !edge_ok {
         return false;
     }
+    // Check counting invariant: 2E == HE
+    let ecnt = m.edge_half_edges.len();
+    let hcnt = m.half_edges.len();
+    if ecnt > usize::MAX / 2 {
+        return false;
+    }
+    if 2 * ecnt != hcnt {
+        return false;
+    }
+    // Check counting invariant: HE >= 3F
+    let fcnt = m.face_half_edges.len();
+    if fcnt > usize::MAX / 3 {
+        return false;
+    }
+    if hcnt < 3 * fcnt {
+        return false;
+    }
     true
 }
 
