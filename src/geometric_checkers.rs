@@ -82,29 +82,19 @@ pub fn check_consistently_oriented_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (ou
 
         let sign = orient2d_sign_exec(&pos[v0], &pos[v1], &pos[v2]);
 
-        if sign != OrientationSign::Positive {
-            return false;
-        }
-
-        proof {
-            let pv = pos_view_2d(pos);
-            // Step 1: exec postcondition gives us the sign
-            assert(sign == orient2d_sign::<RationalModel>(
-                pos@[v0 as int]@, pos@[v1 as int]@, pos@[v2 as int]@));
-            // Step 2: combined with sign == Positive
-            assert(orient2d_sign::<RationalModel>(
-                pos@[v0 as int]@, pos@[v1 as int]@, pos@[v2 as int]@)
-                == OrientationSign::Positive);
-            // Step 3: Seq::new unfolding
-            assert(pv[v0 as int] == pos@[v0 as int]@);
-            assert(pv[v1 as int] == pos@[v1 as int]@);
-            assert(pv[v2 as int] == pos@[v2 as int]@);
-            // Step 4: substitution into orient2d_sign
-            assert(orient2d_sign::<RationalModel>(
-                pv[v0 as int], pv[v1 as int], pv[v2 as int])
-                == OrientationSign::Positive);
-            // Step 5: face_oriented_ccw_2d unfolding
-            assert(face_oriented_ccw_2d::<RationalModel>(m, pv, f as int));
+        // Use match to give Z3 the spec-level equality
+        match sign {
+            OrientationSign::Positive => {
+                proof {
+                    let pv = pos_view_2d(pos);
+                    // Seq::new unfolds at specific indices
+                    assert(pv[v0 as int] == pos@[v0 as int]@);
+                    assert(pv[v1 as int] == pos@[v1 as int]@);
+                    assert(pv[v2 as int] == pos@[v2 as int]@);
+                    assert(face_oriented_ccw_2d::<RationalModel>(m, pv, f as int));
+                }
+            }
+            _ => { return false; }
         }
 
         f = f + 1;
@@ -160,24 +150,17 @@ pub fn check_consistently_oriented_3d(
 
         let sign = orient3d_sign_exec(&pos[v0], &pos[v1], &pos[v2], interior);
 
-        if sign != OrientationSign::Negative {
-            return false;
-        }
-
-        proof {
-            let pv = pos_view_3d(pos);
-            assert(sign == orient3d_sign::<RationalModel>(
-                pos@[v0 as int]@, pos@[v1 as int]@, pos@[v2 as int]@, interior@));
-            assert(orient3d_sign::<RationalModel>(
-                pos@[v0 as int]@, pos@[v1 as int]@, pos@[v2 as int]@, interior@)
-                == OrientationSign::Negative);
-            assert(pv[v0 as int] == pos@[v0 as int]@);
-            assert(pv[v1 as int] == pos@[v1 as int]@);
-            assert(pv[v2 as int] == pos@[v2 as int]@);
-            assert(orient3d_sign::<RationalModel>(
-                pv[v0 as int], pv[v1 as int], pv[v2 as int], interior@)
-                == OrientationSign::Negative);
-            assert(face_outward_normal_3d::<RationalModel>(m, pv, f as int, interior@));
+        match sign {
+            OrientationSign::Negative => {
+                proof {
+                    let pv = pos_view_3d(pos);
+                    assert(pv[v0 as int] == pos@[v0 as int]@);
+                    assert(pv[v1 as int] == pos@[v1 as int]@);
+                    assert(pv[v2 as int] == pos@[v2 as int]@);
+                    assert(face_outward_normal_3d::<RationalModel>(m, pv, f as int, interior@));
+                }
+            }
+            _ => { return false; }
         }
 
         f = f + 1;
