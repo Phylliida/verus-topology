@@ -11,7 +11,15 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 VERUS_ROOT="${VERUS_ROOT:-$ROOT_DIR/../verus}"
 VERUS_SOURCE="$VERUS_ROOT/source"
-TOOLCHAIN="${VERUS_TOOLCHAIN:-1.93.0-x86_64-unknown-linux-gnu}"
+if [[ -z "${VERUS_TOOLCHAIN:-}" ]]; then
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64)  TOOLCHAIN="1.93.0-aarch64-apple-darwin" ;;
+    Darwin-x86_64) TOOLCHAIN="1.93.0-x86_64-apple-darwin" ;;
+    *)             TOOLCHAIN="1.93.0-x86_64-unknown-linux-gnu" ;;
+  esac
+else
+  TOOLCHAIN="$VERUS_TOOLCHAIN"
+fi
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   cat <<'EOF'
@@ -64,7 +72,7 @@ run_cargo_verus() {
     export RUSTUP_TOOLCHAIN="$TOOLCHAIN"
     cd "$ROOT_DIR"
     cargo verus verify --manifest-path Cargo.toml -p verus-topology \
-      -- --output-json --time-expanded --triggers-mode silent 2>/dev/null > "$JSON_FILE"
+      -- --output-json --time-expanded --triggers-mode silent > "$JSON_FILE" 2>&1
   elif command -v nix-shell >/dev/null 2>&1; then
     nix-shell -p rustup --run "
       set -euo pipefail
@@ -73,7 +81,7 @@ run_cargo_verus() {
       export VERUS_Z3_PATH='$VERUS_SOURCE/z3'
       cd '$ROOT_DIR'
       cargo verus verify --manifest-path Cargo.toml -p verus-topology \
-        -- --output-json --time-expanded --triggers-mode silent 2>/dev/null > '$JSON_FILE'
+        -- --output-json --time-expanded --triggers-mode silent > '$JSON_FILE' 2>&1
     "
   else
     echo "error: neither rustup nor nix-shell found in PATH"
@@ -106,7 +114,15 @@ top_n = int(sys.argv[2])
 wall = int(sys.argv[3])
 
 with open(json_path) as f:
-    data = json.load(f)
+    raw = f.read().strip()
+
+# The JSON object may be preceded by compiler output lines (e.g. "Compiling ...").
+# Find the first '{' to locate the start of the JSON blob.
+json_start = raw.find('{')
+if json_start < 0:
+    print(f"error: no JSON object found in output. Raw output:\n{raw[:500]}", file=sys.stderr)
+    sys.exit(1)
+data = json.loads(raw[json_start:])
 
 times = data.get("times-ms", {})
 smt = times.get("smt", {})
