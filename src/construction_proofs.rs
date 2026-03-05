@@ -21,29 +21,17 @@ verus! {
 // =============================================================================
 
 /// After from_face_cycles construction, all indices are in bounds.
-///
-/// Proof sketch:
-/// - Phase A validates all vertex indices < vertex_count
-/// - Phase B sets next/prev within face-local ranges [start..start+n)
-/// - Phase C sets twin to valid indices found during scan
-/// - Phase D sets edge indices as they are created (0..ecnt-1)
-/// - Phase E assigns vertex_half_edges from scanned half-edges
+/// Now proved directly inside from_face_cycles via Phase B/C/D/E ghost invariants
+/// + lemma_index_bounds_from_construction helper. This lemma is kept for the
+/// dependency chain in lemma_construction_structurally_valid.
 pub proof fn lemma_construction_index_bounds(m: &Mesh)
     requires
-        // Precondition: mesh was built by from_face_cycles phases B-E
-        // with valid inputs (vertex_count > 0, face_cycles non-empty,
-        // all vertices < vertex_count, all faces >= 3 vertices)
-        //
-        // We express this abstractly: all field lengths are positive
-        // and all referenced indices are within their respective arrays.
-        vertex_count(m) > 0,
-        edge_count(m) > 0,
-        face_count(m) > 0,
-        half_edge_count(m) > 0,
+        index_bounds(m),
     ensures
         index_bounds(m),
 {
-    assume(false); // deferred: loop invariant tracking through phases B-E
+    // Trivially true: precondition == postcondition.
+    // The actual proof is in from_face_cycles construction.
 }
 
 // =============================================================================
@@ -58,39 +46,32 @@ pub proof fn lemma_construction_index_bounds(m: &Mesh)
 ///
 /// Therefore: HE[HE[h].next].prev == h and HE[HE[h].prev].next == h
 /// for all h in any face cycle.
+/// Now proved directly inside from_face_cycles via Phase B ghost invariants
+/// + Phase C/D frame invariants. This lemma is kept for the dependency chain
+/// in lemma_construction_structurally_valid.
 pub proof fn lemma_construction_prev_next_bidirectional(m: &Mesh)
     requires
-        index_bounds(m),
-        // Mesh was built by from_face_cycles phase B
-        vertex_count(m) > 0,
-        face_count(m) > 0,
-        half_edge_count(m) >= 3,
+        prev_next_bidirectional(m),
     ensures
         prev_next_bidirectional(m),
 {
-    assume(false); // deferred: induction over face cycles
+    // Trivially true: precondition == postcondition.
+    // The actual proof is in from_face_cycles construction.
 }
 
 // =============================================================================
 // 3. Twin involution
 // =============================================================================
 
-/// Phase C matching: for every h, we find t such that
-///   (from(h), to(h)) = (to(t), from(t)).
-/// If we set h.twin = t, and later process t, we find h as its match
-/// (since the matching is unique and symmetric).
-/// Therefore twin(twin(h)) == h.
+/// Now proved directly inside from_face_cycles via post-Phase-C twin involution
+/// check loop.
 pub proof fn lemma_construction_twin_involution(m: &Mesh)
     requires
-        index_bounds(m),
-        // Mesh was built by from_face_cycles phases B-C
-        vertex_count(m) > 0,
-        face_count(m) > 0,
-        half_edge_count(m) >= 6, // at least 2 faces
+        twin_involution(m),
     ensures
         twin_involution(m),
 {
-    assume(false); // deferred: matching uniqueness + symmetry
+    // Trivially true: precondition == postcondition.
 }
 
 // =============================================================================
@@ -103,18 +84,14 @@ pub proof fn lemma_construction_twin_involution(m: &Mesh)
 /// also has distinct endpoints.
 ///
 /// Therefore: vertex(h) != vertex(twin(h)) and vertex(h) != vertex(next(h)).
+/// Now proved directly inside from_face_cycles via Phase B vertex-distinct
+/// + Phase C twin-vertex tracking.
 pub proof fn lemma_construction_no_degenerate_edges(m: &Mesh)
     requires
-        index_bounds(m),
-        twin_involution(m),
-        prev_next_bidirectional(m),
-        // Mesh was built by from_face_cycles with Phase A validation
-        vertex_count(m) > 0,
-        face_count(m) > 0,
+        no_degenerate_edges(m),
     ensures
         no_degenerate_edges(m),
 {
-    assume(false); // deferred: Phase A rejection + Phase C matching
 }
 
 // =============================================================================
@@ -127,18 +104,15 @@ pub proof fn lemma_construction_no_degenerate_edges(m: &Mesh)
 ///
 /// Twin endpoints swap because Phase C explicitly matches
 /// from(h)→to(h) with to(t)→from(t).
+/// Now proved directly inside from_face_cycles via Phase C endpoint tracking
+/// + post-Phase-C face distinctness check.
 pub proof fn lemma_construction_shared_edge_orientation_consistency(m: &Mesh)
     requires
-        index_bounds(m),
-        twin_involution(m),
-        prev_next_bidirectional(m),
-        no_degenerate_edges(m),
-        vertex_count(m) > 0,
-        face_count(m) > 0,
+        shared_edge_orientation_consistency(m),
     ensures
         shared_edge_orientation_consistency(m),
 {
-    assume(false); // deferred: Phase C matching logic
+    // Trivially true: precondition == postcondition.
 }
 
 // =============================================================================
@@ -233,31 +207,31 @@ pub proof fn lemma_construction_vertex_manifold(m: &Mesh)
 // Composite: all invariants together
 // =============================================================================
 
-/// 2 * edge_count == half_edge_count follows from edge_exactly_two_half_edges.
+/// Now proved directly inside from_face_cycles via post-Phase-D counting check
+/// (2 * edge_half_edges.len() == hcnt).
 pub proof fn lemma_construction_half_edge_edge_count_relation(m: &Mesh)
     requires
-        index_bounds(m),
-        edge_exactly_two_half_edges(m),
-        edge_count(m) > 0,
+        half_edge_edge_count_relation(m),
     ensures
         half_edge_edge_count_relation(m),
 {
-    assume(false); // deferred: counting argument from edge_exactly_two_half_edges
+    // Trivially true: precondition == postcondition.
 }
 
 /// half_edge_count >= 3 * face_count follows from face cycles covering all HEs.
+/// Now proved directly inside from_face_cycles via Phase B loop invariant
+/// tracking half_edges.len() >= 3 * f.
 pub proof fn lemma_construction_half_edge_face_count_lower_bound(m: &Mesh)
     requires
-        index_bounds(m),
-        face_representative_cycles_cover_all_half_edges(m),
-        face_count(m) > 0,
+        half_edge_face_count_lower_bound(m),
     ensures
         half_edge_face_count_lower_bound(m),
 {
-    assume(false); // deferred: counting argument from face cycle coverage
+    // Trivially true: precondition == postcondition.
 }
 
 /// Wire all construction proofs together to prove structurally_valid.
+/// Properties proved in from_face_cycles appear as preconditions.
 pub proof fn lemma_construction_structurally_valid(m: &Mesh)
     requires
         // Abstract preconditions from from_face_cycles
@@ -265,11 +239,18 @@ pub proof fn lemma_construction_structurally_valid(m: &Mesh)
         edge_count(m) > 0,
         face_count(m) > 0,
         half_edge_count(m) >= 6,
+        // Properties proved directly in from_face_cycles:
+        index_bounds(m),
+        twin_involution(m),
+        prev_next_bidirectional(m),
+        no_degenerate_edges(m),
+        shared_edge_orientation_consistency(m),
+        half_edge_edge_count_relation(m),
+        half_edge_face_count_lower_bound(m),
     ensures
         structurally_valid(m),
 {
     lemma_construction_index_bounds(m);
-    lemma_construction_prev_next_bidirectional(m);
     lemma_construction_twin_involution(m);
     lemma_construction_no_degenerate_edges(m);
     lemma_construction_shared_edge_orientation_consistency(m);
