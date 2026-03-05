@@ -302,4 +302,21 @@ pub open spec fn structurally_valid(m: &Mesh) -> bool {
     &&& half_edge_face_count_lower_bound(m)
 }
 
+// --- Closedness ---
+
+/// A mesh is closed iff every edge has exactly two half-edges
+/// and twin half-edges belong to distinct faces.
+pub open spec fn is_closed(m: &Mesh) -> bool {
+    edge_exactly_two_half_edges(m) && twin_faces_distinct(m)
+}
+
+/// structurally_valid implies is_closed.
+pub proof fn lemma_structurally_valid_is_closed(m: &Mesh)
+    requires
+        structurally_valid(m),
+    ensures
+        is_closed(m),
+{
+}
+
 } // verus!

@@ -1329,18 +1329,40 @@ pub fn from_face_cycles(
 pub fn tetrahedron() -> (result: Result<Mesh, MeshBuildError>)
     ensures
         result is Ok ==> structurally_valid(&result->Ok_0),
+        result is Ok ==> vertex_count(&result->Ok_0) == 4,
+        result is Ok ==> edge_count(&result->Ok_0) == 6,
+        result is Ok ==> face_count(&result->Ok_0) == 4,
+        result is Ok ==> half_edge_count(&result->Ok_0) == 12,
 {
     let f0: Vec<usize> = vec![0, 1, 2];
     let f1: Vec<usize> = vec![0, 3, 1];
     let f2: Vec<usize> = vec![1, 3, 2];
     let f3: Vec<usize> = vec![2, 3, 0];
     let faces: Vec<Vec<usize>> = vec![f0, f1, f2, f3];
-    from_face_cycles(4, faces.as_slice())
+    let r = from_face_cycles(4, faces.as_slice());
+    match r {
+        Ok(mesh) => {
+            let v = mesh.vertex_half_edges.len();
+            let e = mesh.edge_half_edges.len();
+            let f = mesh.face_half_edges.len();
+            let he = mesh.half_edges.len();
+            if v == 4 && e == 6 && f == 4 && he == 12 {
+                Ok(mesh)
+            } else {
+                Err(MeshBuildError::ValidationFailed)
+            }
+        },
+        Err(err) => Err(err),
+    }
 }
 
 pub fn cube() -> (result: Result<Mesh, MeshBuildError>)
     ensures
         result is Ok ==> structurally_valid(&result->Ok_0),
+        result is Ok ==> vertex_count(&result->Ok_0) == 8,
+        result is Ok ==> edge_count(&result->Ok_0) == 12,
+        result is Ok ==> face_count(&result->Ok_0) == 6,
+        result is Ok ==> half_edge_count(&result->Ok_0) == 24,
 {
     // Vertices: 0-7 for unit cube
     // Faces (outward-facing, CCW from outside):
@@ -1351,7 +1373,21 @@ pub fn cube() -> (result: Result<Mesh, MeshBuildError>)
     let f4: Vec<usize> = vec![0, 4, 5, 1]; // bottom
     let f5: Vec<usize> = vec![3, 2, 6, 7]; // top
     let faces: Vec<Vec<usize>> = vec![f0, f1, f2, f3, f4, f5];
-    from_face_cycles(8, faces.as_slice())
+    let r = from_face_cycles(8, faces.as_slice());
+    match r {
+        Ok(mesh) => {
+            let v = mesh.vertex_half_edges.len();
+            let e = mesh.edge_half_edges.len();
+            let f = mesh.face_half_edges.len();
+            let he = mesh.half_edges.len();
+            if v == 8 && e == 12 && f == 6 && he == 24 {
+                Ok(mesh)
+            } else {
+                Err(MeshBuildError::ValidationFailed)
+            }
+        },
+        Err(err) => Err(err),
+    }
 }
 
 } // verus!

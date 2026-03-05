@@ -27,3 +27,9 @@ pub mod geometric_mesh;
 
 #[cfg(verus_keep_ghost)]
 pub mod construction_proofs;
+
+#[cfg(verus_keep_ghost)]
+pub mod connectivity;
+
+#[cfg(verus_keep_ghost)]
+pub mod geometric_checkers;

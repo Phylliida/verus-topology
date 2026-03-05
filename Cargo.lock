@@ -120,8 +120,10 @@ name = "verus-topology"
 version = "0.1.0"
 dependencies = [
  "verus-algebra",
+ "verus-bigint",
  "verus-geometry",
  "verus-linalg",
+ "verus-rational",
  "vstd",
 ]
 
