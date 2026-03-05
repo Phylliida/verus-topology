@@ -122,26 +122,16 @@ pub proof fn lemma_construction_shared_edge_orientation_consistency(m: &Mesh)
 // =============================================================================
 
 /// Face cycles are contiguous blocks of half-edges created in Phase B.
-/// Each face f gets HEs [start_f, start_f + 1, ..., start_f + n_f - 1]
-/// with circular next/prev linking.
-///
-/// The face representative face_half_edges[f] = start_f is the first HE
-/// in the cycle. Walking next from start_f visits exactly n_f HEs
-/// before returning to start_f, and all have face == f.
-///
-/// Since all HEs are created in exactly one face's cycle, the cycles
-/// partition all half-edges.
+/// Now proved directly inside from_face_cycles via ghost face_block_sizes
+/// + lemma_contiguous_block_is_face_cycle helper.
 pub proof fn lemma_construction_face_representative_cycles(m: &Mesh)
     requires
-        index_bounds(m),
-        prev_next_bidirectional(m),
-        vertex_count(m) > 0,
-        face_count(m) > 0,
-        half_edge_count(m) >= 3,
+        face_representative_cycles_cover_all_half_edges(m),
     ensures
         face_representative_cycles_cover_all_half_edges(m),
 {
-    assume(false); // deferred: Phase B contiguous block construction + face assignment
+    // Trivially true: precondition == postcondition.
+    // The actual proof is in from_face_cycles construction.
 }
 
 // =============================================================================
@@ -170,38 +160,18 @@ pub proof fn lemma_construction_edge_exactly_two_half_edges(m: &Mesh)
 // 8. Vertex manifold
 // =============================================================================
 
-/// The hardest invariant. Each vertex v's ring is formed by the sequence
-/// of half-edges with vertex == v, connected via twin.next.
-///
-/// Starting from any HE h with vertex(h) == v:
-///   twin(h) goes to a different face
-///   next(twin(h)) returns to vertex v in the next face
-///   Repeating forms a cycle visiting all incident faces of v exactly once.
-///
-/// This requires:
-/// - Twin involution (to bounce between faces)
-/// - Face cycles are proper (next traversal works correctly)
-/// - The mesh is manifold (each edge is shared by exactly 2 faces)
-/// - The link of v is a topological circle
-///
-/// The last condition is the hardest: it requires that the input
-/// face cycles around each vertex form a single connected fan,
-/// not multiple disconnected components.
+/// Vertex manifold is not provable from construction alone: non-manifold
+/// inputs (e.g., two tetrahedra sharing only a vertex) pass all construction
+/// phases but have disconnected vertex links. Covered by the runtime
+/// check_structurally_valid call.
 pub proof fn lemma_construction_vertex_manifold(m: &Mesh)
     requires
-        index_bounds(m),
-        twin_involution(m),
-        prev_next_bidirectional(m),
-        no_degenerate_edges(m),
-        shared_edge_orientation_consistency(m),
-        face_representative_cycles_cover_all_half_edges(m),
-        edge_exactly_two_half_edges(m),
-        vertex_count(m) > 0,
-        face_count(m) > 0,
+        vertex_manifold(m),
     ensures
         vertex_manifold(m),
 {
-    assume(false); // deferred: fan connectivity + cycle formation around each vertex
+    // Trivially true: precondition == postcondition.
+    // vertex_manifold is verified by the runtime check_structurally_valid.
 }
 
 // =============================================================================
@@ -233,6 +203,8 @@ pub proof fn lemma_construction_half_edge_face_count_lower_bound(m: &Mesh)
 
 /// Wire all construction proofs together to prove structurally_valid.
 /// Properties proved in from_face_cycles appear as preconditions.
+/// face_representative_cycles is proved from construction ghost state.
+/// vertex_manifold is verified by the runtime check_structurally_valid.
 pub proof fn lemma_construction_structurally_valid(m: &Mesh)
     requires
         // Abstract preconditions from from_face_cycles
@@ -249,6 +221,10 @@ pub proof fn lemma_construction_structurally_valid(m: &Mesh)
         edge_exactly_two_half_edges(m),
         half_edge_edge_count_relation(m),
         half_edge_face_count_lower_bound(m),
+        // Proved from construction ghost state (face_block_sizes):
+        face_representative_cycles_cover_all_half_edges(m),
+        // Verified by runtime check_structurally_valid:
+        vertex_manifold(m),
     ensures
         structurally_valid(m),
 {
@@ -261,6 +237,333 @@ pub proof fn lemma_construction_structurally_valid(m: &Mesh)
     lemma_construction_vertex_manifold(m);
     lemma_construction_half_edge_edge_count_relation(m);
     lemma_construction_half_edge_face_count_lower_bound(m);
+}
+
+// =============================================================================
+// Contiguous block → face cycle witness helpers
+// =============================================================================
+
+/// For a contiguous block [start, start+n) with circular next,
+/// next_iter(m, start, step) = start + step for step < n,
+/// and next_iter(m, start, n) = start.
+pub proof fn lemma_contiguous_block_next_iter(m: &Mesh, start: int, n: int, step: nat)
+    requires
+        index_bounds(m),
+        n >= 1,
+        0 <= start,
+        start + n <= half_edge_count(m),
+        forall|j: int| 0 <= j < n ==>
+            (#[trigger] m.half_edges@[start + j]).next as int
+                == start + (if j + 1 < n { j + 1 } else { 0 }),
+        step <= n,
+    ensures
+        next_iter(m, start, step)
+            == (if (step as int) < n { start + step as int } else { start }),
+    decreases step
+{
+    if step == 0 {
+        // next_iter(m, start, 0) = start, and 0 < n ✓
+    } else {
+        lemma_contiguous_block_next_iter(m, start, n, (step - 1) as nat);
+        let prev_pos = next_iter(m, start, (step - 1) as nat);
+        // IH: prev_pos = start + (step - 1) since step - 1 < n
+        assert(prev_pos == start + (step as int - 1));
+        let j = step as int - 1;
+        assert(0 <= j && j < n);
+        // next_or_self(m, prev_pos) = m.half_edges[prev_pos].next
+        assert(0 <= prev_pos && prev_pos < half_edge_count(m));
+        let he = m.half_edges@[start + j];
+        assert(he.next as int == start + (if j + 1 < n { j + 1 } else { 0 }));
+        assert(next_or_self(m, prev_pos) == m.half_edges@[prev_pos].next as int);
+    }
+}
+
+/// A contiguous block [start, start+n) with circular next and face == f
+/// forms a valid face_representative_cycle_witness.
+pub proof fn lemma_contiguous_block_is_face_cycle(m: &Mesh, f: int, n: int)
+    requires
+        index_bounds(m),
+        0 <= f < face_count(m),
+        n >= 3,
+        0 <= m.face_half_edges@[f] as int,
+        m.face_half_edges@[f] as int + n <= half_edge_count(m),
+        forall|j: int| 0 <= j < n ==>
+            (#[trigger] m.half_edges@[m.face_half_edges@[f] as int + j]).next as int
+                == m.face_half_edges@[f] as int
+                    + (if j + 1 < n { j + 1 } else { 0 }),
+        forall|j: int| 0 <= j < n ==>
+            (#[trigger] m.half_edges@[m.face_half_edges@[f] as int + j]).face as int == f,
+    ensures
+        face_representative_cycle_witness(m, f, n),
+{
+    let start = m.face_half_edges@[f] as int;
+
+    // 1. 3 <= n <= hcnt
+    assert(3 <= n <= half_edge_count(m));
+
+    // 2. next_iter(m, start, n) == start
+    lemma_contiguous_block_next_iter(m, start, n, n as nat);
+    assert(next_iter(m, start, n as nat) == start);
+
+    // 3. All positions have face == f
+    assert forall|i: int| 0 <= i < n implies
+        #[trigger] m.half_edges@[next_iter(m, start, i as nat)].face as int == f
+    by {
+        lemma_contiguous_block_next_iter(m, start, n, i as nat);
+        assert(next_iter(m, start, i as nat) == start + i);
+    };
+
+    // 4. All positions are distinct (different indices → different values)
+    assert forall|i: int, j: int|
+        #![trigger next_iter(m, start, i as nat), next_iter(m, start, j as nat)]
+        0 <= i < j < n implies
+        next_iter(m, start, i as nat) != next_iter(m, start, j as nat)
+    by {
+        lemma_contiguous_block_next_iter(m, start, n, i as nat);
+        lemma_contiguous_block_next_iter(m, start, n, j as nat);
+        // start + i != start + j since i != j
+    };
+}
+
+// =============================================================================
+// Face cycle coverage from contiguous blocks
+// =============================================================================
+
+/// Given contiguous blocks covering [0, hcnt), find which block contains h.
+/// Search starts from block ff.
+proof fn lemma_find_block(
+    face_half_edges: Seq<usize>,
+    face_block_sizes: Seq<usize>,
+    fcnt: int,
+    hcnt: int,
+    h: int,
+    ff: int,
+)
+    requires
+        face_half_edges.len() >= fcnt,
+        face_block_sizes.len() >= fcnt,
+        fcnt > 0,
+        0 <= ff <= fcnt,
+        0 <= h < hcnt,
+        forall|f: int| 0 <= f < fcnt ==>
+            (#[trigger] face_block_sizes[f]) as int >= 1,
+        face_half_edges[0] as int == 0,
+        forall|f: int| 0 <= f < fcnt ==> {
+            &&& face_half_edges[f] as int
+                    + (#[trigger] face_block_sizes[f]) as int <= hcnt
+            &&& face_half_edges[f] as int + face_block_sizes[f] as int
+                == (if f + 1 < fcnt
+                    { face_half_edges[f + 1] as int }
+                    else { hcnt })
+        },
+        h >= (if ff < fcnt { face_half_edges[ff] as int } else { hcnt }),
+    ensures
+        exists|f: int| {
+            &&& 0 <= f < fcnt
+            &&& face_half_edges[f] as int <= h
+            &&& h < face_half_edges[f] as int + face_block_sizes[f] as int
+        },
+    decreases fcnt - ff,
+{
+    if ff >= fcnt {
+        // h >= hcnt contradicts h < hcnt
+    } else if h < face_half_edges[ff] as int + face_block_sizes[ff] as int {
+        // h is in block ff
+    } else {
+        if ff + 1 < fcnt {
+            lemma_find_block(face_half_edges, face_block_sizes, fcnt, hcnt, h, ff + 1);
+        }
+        // else: h >= hcnt, contradiction
+    }
+}
+
+/// Given contiguous block structure, prove face_representative_cycles_cover_all_half_edges.
+pub proof fn lemma_face_cycles_from_blocks(
+    m: &Mesh,
+    face_block_sizes: Seq<usize>,
+)
+    requires
+        index_bounds(m),
+        face_block_sizes.len() == face_count(m),
+        face_count(m) > 0,
+        half_edge_count(m) > 0,
+        forall|ff: int| 0 <= ff < face_count(m) ==>
+            (#[trigger] face_block_sizes[ff]) as int >= 3,
+        m.face_half_edges@[0] as int == 0,
+        forall|ff: int| 0 <= ff < face_count(m) ==> {
+            &&& m.face_half_edges@[ff] as int
+                    + (#[trigger] face_block_sizes[ff]) as int
+                <= half_edge_count(m)
+            &&& m.face_half_edges@[ff] as int + face_block_sizes[ff] as int
+                == (if ff + 1 < face_count(m)
+                    { m.face_half_edges@[ff + 1] as int }
+                    else { half_edge_count(m) })
+        },
+        forall|ff: int, j: int|
+            #![trigger m.half_edges@[m.face_half_edges@[ff] as int + j]]
+            0 <= ff < face_count(m)
+                && 0 <= j < face_block_sizes[ff] as int ==> {
+                &&& m.half_edges@[m.face_half_edges@[ff] as int + j].next as int
+                    == m.face_half_edges@[ff] as int
+                        + (if j + 1 < face_block_sizes[ff] as int
+                            { j + 1 } else { 0 })
+                &&& m.half_edges@[m.face_half_edges@[ff] as int + j].face as int == ff
+            },
+    ensures
+        face_representative_cycles_cover_all_half_edges(m),
+{
+    let face_cycle_lens = face_block_sizes;
+    let covered = Seq::new(half_edge_count(m) as nat, |h: int| true);
+
+    // Prove directly via by block
+    assert(face_representative_cycles_cover_all_half_edges_witness(
+        m, face_cycle_lens, covered,
+    )) by {
+        // Clause 1: face_cycle_lens.len() == face_count(m)
+        assert(face_cycle_lens.len() == face_count(m));
+
+        // Clause 2: covered.len() == half_edge_count(m)
+        assert(covered.len() == half_edge_count(m));
+
+        // Clause 3: face_representative_cycle_witness for each face
+        assert forall|f: int|
+            #![trigger face_cycle_lens[f]]
+            0 <= f < face_count(m) implies
+            face_representative_cycle_witness(m, f, face_cycle_lens[f] as int)
+        by {
+            lemma_contiguous_block_is_face_cycle(m, f, face_block_sizes[f] as int);
+        };
+
+        // Clause 4: coverage — every HE is in some face's cycle
+        assert forall|h: int|
+            #![trigger h + 0]
+            0 <= h < half_edge_count(m) && #[trigger] covered[h] implies
+            (exists|f: int, i: int| {
+                &&& 0 <= f < face_count(m)
+                &&& 0 <= i < face_cycle_lens[f] as int
+                &&& #[trigger] next_iter(m, m.face_half_edges@[f] as int, i as nat) == h
+            })
+        by {
+            lemma_find_block(
+                m.face_half_edges@, face_block_sizes,
+                face_count(m), half_edge_count(m), h, 0,
+            );
+            let ff = choose|ff: int| {
+                &&& 0 <= ff < face_count(m)
+                &&& m.face_half_edges@[ff] as int <= h
+                &&& h < m.face_half_edges@[ff] as int + face_block_sizes[ff] as int
+            };
+            let start = m.face_half_edges@[ff] as int;
+            let i = h - start;
+            lemma_contiguous_block_next_iter(
+                m, start, face_block_sizes[ff] as int, i as nat,
+            );
+            assert(next_iter(m, m.face_half_edges@[ff] as int, i as nat) == h);
+        };
+
+        // Clause 5: all covered (trivially all true)
+        assert forall|h: int| 0 <= h < half_edge_count(m) implies
+            #[trigger] covered[h]
+        by {};
+
+        // Clause 6: injectivity — same position → same face
+        assert forall|f1: int, i1: int, f2: int, i2: int|
+            #![trigger next_iter(m, m.face_half_edges@[f1] as int, i1 as nat),
+                      next_iter(m, m.face_half_edges@[f2] as int, i2 as nat)]
+            0 <= f1 < face_count(m)
+                && 0 <= f2 < face_count(m)
+                && 0 <= i1 < face_cycle_lens[f1] as int
+                && 0 <= i2 < face_cycle_lens[f2] as int
+                && next_iter(m, m.face_half_edges@[f1] as int, i1 as nat)
+                    == next_iter(m, m.face_half_edges@[f2] as int, i2 as nat)
+                implies f1 == f2
+        by {
+            let start1 = m.face_half_edges@[f1] as int;
+            let start2 = m.face_half_edges@[f2] as int;
+            lemma_contiguous_block_next_iter(
+                m, start1, face_block_sizes[f1] as int, i1 as nat,
+            );
+            lemma_contiguous_block_next_iter(
+                m, start2, face_block_sizes[f2] as int, i2 as nat,
+            );
+            assert(m.half_edges@[m.face_half_edges@[f1] as int + i1].face as int == f1);
+            assert(m.half_edges@[m.face_half_edges@[f2] as int + i2].face as int == f2);
+        };
+    };
+}
+
+/// Prove face_representative_cycles_cover_all_half_edges from Phase B ghost state
+/// with frame chaining through Phases C and D.
+pub proof fn lemma_face_rep_cycles_from_construction(
+    mesh: &Mesh,
+    post_phase_b: Seq<HalfEdge>,
+    pre_phase_d: Seq<HalfEdge>,
+    face_block_sizes: Seq<usize>,
+)
+    requires
+        index_bounds(mesh),
+        face_count(mesh) > 0,
+        half_edge_count(mesh) > 0,
+        post_phase_b.len() == half_edge_count(mesh),
+        pre_phase_d.len() == half_edge_count(mesh),
+        face_block_sizes.len() == face_count(mesh),
+        forall|ff: int| 0 <= ff < face_count(mesh) ==>
+            (#[trigger] face_block_sizes[ff]) as int >= 3,
+        mesh.face_half_edges@[0] as int == 0,
+        // Contiguity
+        forall|ff: int| 0 <= ff < face_count(mesh) ==> {
+            &&& mesh.face_half_edges@[ff] as int
+                    + (#[trigger] face_block_sizes[ff]) as int
+                <= half_edge_count(mesh)
+            &&& mesh.face_half_edges@[ff] as int + face_block_sizes[ff] as int
+                == (if ff + 1 < face_count(mesh)
+                    { mesh.face_half_edges@[ff + 1] as int }
+                    else { half_edge_count(mesh) })
+        },
+        // Phase B block structure on post_phase_b
+        forall|ff: int, j: int|
+            #![trigger post_phase_b[mesh.face_half_edges@[ff] as int + j]]
+            0 <= ff < face_count(mesh)
+                && 0 <= j < face_block_sizes[ff] as int ==> {
+                &&& post_phase_b[mesh.face_half_edges@[ff] as int + j].next as int
+                    == mesh.face_half_edges@[ff] as int
+                        + (if j + 1 < face_block_sizes[ff] as int { j + 1 } else { 0 })
+                &&& post_phase_b[mesh.face_half_edges@[ff] as int + j].face as int == ff
+            },
+        // Phase D frame (mesh → pre_phase_d): next/face preserved
+        forall|k: int| #![trigger mesh.half_edges@[k]]
+            0 <= k < half_edge_count(mesh) ==> {
+                &&& mesh.half_edges@[k].next == pre_phase_d[k].next
+                &&& mesh.half_edges@[k].face == pre_phase_d[k].face
+            },
+        // Phase C frame (pre_phase_d → post_phase_b): next/face preserved
+        forall|k: int| #![trigger pre_phase_d[k]]
+            0 <= k < half_edge_count(mesh) ==> {
+                &&& pre_phase_d[k].next == post_phase_b[k].next
+                &&& pre_phase_d[k].face == post_phase_b[k].face
+            },
+    ensures
+        face_representative_cycles_cover_all_half_edges(mesh),
+{
+    // Chain frames to establish block structure on the final mesh
+    assert forall|ff: int, j: int|
+        #![trigger mesh.half_edges@[mesh.face_half_edges@[ff] as int + j]]
+        0 <= ff < face_count(mesh)
+            && 0 <= j < face_block_sizes[ff] as int
+            implies {
+            &&& mesh.half_edges@[mesh.face_half_edges@[ff] as int + j].next as int
+                == mesh.face_half_edges@[ff] as int
+                    + (if j + 1 < face_block_sizes[ff] as int { j + 1 } else { 0 })
+            &&& mesh.half_edges@[mesh.face_half_edges@[ff] as int + j].face as int == ff
+        }
+    by {
+        let idx = mesh.face_half_edges@[ff] as int + j;
+        assert(mesh.half_edges@[idx].next == pre_phase_d[idx].next);
+        assert(pre_phase_d[idx].next == post_phase_b[idx].next);
+        assert(mesh.half_edges@[idx].face == pre_phase_d[idx].face);
+        assert(pre_phase_d[idx].face == post_phase_b[idx].face);
+    };
+    lemma_face_cycles_from_blocks(mesh, face_block_sizes);
 }
 
 // =============================================================================

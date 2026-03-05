@@ -2,6 +2,7 @@ use vstd::prelude::*;
 use crate::mesh::*;
 use crate::invariants::*;
 use crate::checkers::*;
+// Proof helpers are in construction_proofs.rs (called via qualified path)
 
 verus! {
 
@@ -508,6 +509,7 @@ pub fn from_face_cycles(
     // Phase B: Create half-edges from face cycles
     let mut half_edges: Vec<HalfEdge> = Vec::new();
     let mut face_half_edges: Vec<usize> = Vec::with_capacity(face_cycles.len());
+    let ghost mut face_block_sizes = Seq::<usize>::empty();
 
     let mut f: usize = 0;
     while f < face_cycles.len()
@@ -537,6 +539,35 @@ pub fn from_face_cycles(
                 (#[trigger] face_half_edges@[ff] as int) < half_edges@.len(),
             // HE count >= 3 * face count (each face has >= 3 HEs)
             half_edges@.len() >= 3 * f as int,
+            // At f == 0 half_edges is still empty (needed for first-block-starts-at-0)
+            (f == 0 ==> half_edges@.len() == 0),
+            // Ghost: face block sizes tracking
+            face_block_sizes.len() == f as int,
+            forall|ff: int| 0 <= ff < f as int ==>
+                (#[trigger] face_block_sizes[ff]) as int >= 3,
+            // Contiguity: first block starts at 0
+            (f as int > 0 ==> face_half_edges@[0] as int == 0),
+            // Contiguity: each block follows the previous, ending at half_edges.len()
+            forall|ff: int| 0 <= ff < f as int ==> {
+                &&& face_half_edges@[ff] as int
+                        + (#[trigger] face_block_sizes[ff]) as int
+                    <= half_edges@.len()
+                &&& face_half_edges@[ff] as int + face_block_sizes[ff] as int
+                    == (if ff + 1 < f as int
+                        { face_half_edges@[ff + 1] as int }
+                        else { half_edges@.len() as int })
+            },
+            // Block structure: next and face within blocks
+            forall|ff: int, j: int|
+                #![trigger half_edges@[face_half_edges@[ff] as int + j]]
+                0 <= ff < f as int
+                    && 0 <= j < face_block_sizes[ff] as int ==> {
+                    &&& half_edges@[face_half_edges@[ff] as int + j].next as int
+                        == face_half_edges@[ff] as int
+                            + (if j + 1 < face_block_sizes[ff] as int
+                                { j + 1 } else { 0 })
+                    &&& half_edges@[face_half_edges@[ff] as int + j].face as int == ff
+                },
     {
         let cycle = vstd::slice::slice_index_get(face_cycles, f);
         let n = cycle.len();
@@ -794,6 +825,69 @@ pub fn from_face_cycles(
                 } else {
                     // ff == f: face_half_edges[f] = start, half_edges.len() = start + n
                     assert(face_half_edges@[f as int] == start);
+                }
+            }
+        }
+
+        // Ghost: update face_block_sizes and prove new invariants
+        proof {
+            let ghost old_fbs = face_block_sizes;
+            face_block_sizes = face_block_sizes.push(n);
+
+            // Prove face_half_edges@[0] == 0 for the first-block invariant
+            if f == 0 {
+                assert(start as int == 0int);
+                assert(face_half_edges@[0] as int == 0int);
+            }
+
+            // Contiguity for ALL blocks (including new face f)
+            assert forall|ff: int| 0 <= ff < f as int + 1 implies {
+                &&& face_half_edges@[ff] as int
+                        + (#[trigger] face_block_sizes[ff]) as int
+                    <= half_edges@.len() as int
+                &&& face_half_edges@[ff] as int + face_block_sizes[ff] as int
+                    == (if ff + 1 < f as int + 1
+                        { face_half_edges@[ff + 1] as int }
+                        else { half_edges@.len() as int })
+            }
+            by {
+                if ff < f as int {
+                    assert(face_block_sizes[ff] == old_fbs[ff]);
+                    if ff + 1 < f as int {
+                    } else {
+                        assert(face_half_edges@[ff] as int + old_fbs[ff] as int
+                            == pre_inner_hes.len() as int);
+                        assert(face_half_edges@[f as int] as int == start as int);
+                    }
+                } else {
+                    assert(face_half_edges@[f as int] as int == start as int);
+                    assert(face_block_sizes[f as int] == n);
+                }
+            }
+
+            // Block structure for ALL blocks
+            assert forall|ff: int, j: int|
+                #![trigger half_edges@[face_half_edges@[ff] as int + j]]
+                0 <= ff < f as int + 1
+                    && 0 <= j < face_block_sizes[ff] as int
+                    implies {
+                    &&& half_edges@[face_half_edges@[ff] as int + j].next as int
+                        == face_half_edges@[ff] as int
+                            + (if j + 1 < face_block_sizes[ff] as int
+                                { j + 1 } else { 0 })
+                    &&& half_edges@[face_half_edges@[ff] as int + j].face as int == ff
+                }
+            by {
+                assert(face_block_sizes[ff] == if ff < f as int { old_fbs[ff] } else { n });
+                if ff < f as int {
+                    assert(face_half_edges@[ff] as int + old_fbs[ff] as int
+                        <= pre_inner_hes.len() as int);
+                    assert(face_half_edges@[ff] as int + j < start as int);
+                    assert(half_edges@[face_half_edges@[ff] as int + j]
+                        == pre_inner_hes[face_half_edges@[ff] as int + j]);
+                } else {
+                    assert(face_half_edges@[f as int] as int == start as int);
+                    let _ = half_edges@[start as int + j];
                 }
             }
         }
@@ -1213,6 +1307,12 @@ pub fn from_face_cycles(
         // Derive half_edge_face_count_lower_bound
         // Phase B invariant: half_edges.len() >= 3 * f, and f == face_cycles.len()
         assert(half_edge_count(&mesh) >= 3 * face_count(&mesh));
+
+        // Derive face_representative_cycles_cover_all_half_edges
+        crate::construction_proofs::lemma_face_rep_cycles_from_construction(
+            &mesh, post_phase_b, pre_phase_d, face_block_sizes,
+        );
+        assert(face_representative_cycles_cover_all_half_edges(&mesh));
     }
 
     if check_structurally_valid(&mesh) {
