@@ -8,6 +8,8 @@ vstd = { path = "../verus/source/vstd" }
 verus-algebra = { path = "../verus-algebra" }
 verus-linalg = { path = "../verus-linalg" }
 verus-geometry = { path = "../verus-geometry" }
+verus-rational = { path = "../verus-rational" }
+verus-bigint = { path = "../verus-bigint" }
 
 [package.metadata.verus]
 verify = true

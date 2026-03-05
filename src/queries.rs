@@ -3,6 +3,8 @@ use crate::mesh::*;
 use crate::invariants::*;
 use crate::iteration::*;
 use crate::construction_proofs::*;
+use crate::refinement::*;
+use crate::connectivity::*;
 
 verus! {
 
@@ -204,7 +206,7 @@ pub proof fn lemma_vertex_degree_spec_valid(m: &Mesh, v: int)
 
 /// One iteration of the vertex ring walk loop:
 /// proves that vertex_ring_iter(start, count+1) == twin.next of current.
-proof fn lemma_vertex_degree_loop_step(m: &Mesh, start: int, count: nat)
+pub proof fn lemma_vertex_degree_loop_step(m: &Mesh, start: int, count: nat)
     requires
         index_bounds(m),
         0 <= start < half_edge_count(m),
@@ -391,6 +393,262 @@ pub proof fn lemma_triangle_mesh_euler(m: &Mesh)
         2 * euler_characteristic_spec(m) == 2 * vertex_count(m) - face_count(m),
 {
     lemma_triangle_mesh_edge_face_relation(m);
+}
+
+// =============================================================================
+// Euler characteristic preservation lemmas
+// =============================================================================
+
+/// Splitting an edge preserves Euler characteristic: V+1, E+1, F unchanged.
+pub proof fn lemma_split_edge_preserves_euler(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m) + 1,
+        edge_count(r) == edge_count(m) + 1,
+        face_count(r) == face_count(m),
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+}
+
+/// Splitting a face preserves Euler characteristic: V unchanged, E+1, F+1.
+pub proof fn lemma_split_face_preserves_euler(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m),
+        edge_count(r) == edge_count(m) + 1,
+        face_count(r) == face_count(m) + 1,
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+}
+
+/// Flipping an edge preserves Euler characteristic: all counts unchanged.
+pub proof fn lemma_flip_edge_preserves_euler(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m),
+        edge_count(r) == edge_count(m),
+        face_count(r) == face_count(m),
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+}
+
+// =============================================================================
+// Concrete mesh chi = 2 lemmas
+// =============================================================================
+
+/// A tetrahedron has Euler characteristic 2: V=4, E=6, F=4 → 4-6+4=2.
+pub proof fn lemma_tetrahedron_euler(m: &Mesh)
+    requires
+        vertex_count(m) == 4,
+        edge_count(m) == 6,
+        face_count(m) == 4,
+    ensures
+        euler_characteristic_spec(m) == 2,
+{
+}
+
+/// A cube has Euler characteristic 2: V=8, E=12, F=6 → 8-12+6=2.
+pub proof fn lemma_cube_euler(m: &Mesh)
+    requires
+        vertex_count(m) == 8,
+        edge_count(m) == 12,
+        face_count(m) == 6,
+    ensures
+        euler_characteristic_spec(m) == 2,
+{
+}
+
+// =============================================================================
+// Genus (Tier 3b)
+// =============================================================================
+
+/// Genus of a closed orientable surface: g = (2 - chi) / 2.
+pub open spec fn genus_spec(m: &Mesh) -> int {
+    (2 - euler_characteristic_spec(m)) / 2
+}
+
+/// Genus from raw V, E, F counts (for subdivision where counts are formulas, not a Mesh).
+pub open spec fn genus_from_counts_spec(v: int, e: int, f: int) -> int {
+    (2 - (v - e + f)) / 2
+}
+
+/// A tetrahedron has genus 0: chi = 2 → g = 0.
+pub proof fn lemma_tetrahedron_genus_zero(m: &Mesh)
+    requires
+        vertex_count(m) == 4,
+        edge_count(m) == 6,
+        face_count(m) == 4,
+    ensures
+        genus_spec(m) == 0,
+{
+}
+
+/// A cube has genus 0: chi = 2 → g = 0.
+pub proof fn lemma_cube_genus_zero(m: &Mesh)
+    requires
+        vertex_count(m) == 8,
+        edge_count(m) == 12,
+        face_count(m) == 6,
+    ensures
+        genus_spec(m) == 0,
+{
+}
+
+/// Midpoint subdivision preserves genus: sub counts give the same chi.
+pub proof fn lemma_subdivision_preserves_genus(m: &Mesh)
+    requires
+        structurally_valid(m),
+        all_faces_triangles(m),
+    ensures
+        genus_from_counts_spec(
+            subdivision_vertex_count(m),
+            subdivision_edge_count(m),
+            subdivision_face_count(m),
+        ) == genus_spec(m),
+{
+    lemma_subdivision_preserves_euler(m);
+}
+
+// =============================================================================
+// Concrete Euler preservation (Tier 3c)
+// =============================================================================
+
+/// Splitting an edge preserves chi (concrete version for use after exec Euler ops).
+pub proof fn lemma_split_edge_preserves_euler_concrete(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m) + 1,
+        edge_count(r) == edge_count(m) + 1,
+        face_count(r) == face_count(m),
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+    lemma_split_edge_preserves_euler(m, r);
+}
+
+/// Splitting a face preserves chi (concrete version for use after exec Euler ops).
+pub proof fn lemma_split_face_preserves_euler_concrete(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m),
+        edge_count(r) == edge_count(m) + 1,
+        face_count(r) == face_count(m) + 1,
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+    lemma_split_face_preserves_euler(m, r);
+}
+
+/// Flipping an edge preserves chi (concrete version for use after exec Euler ops).
+pub proof fn lemma_flip_edge_preserves_euler_concrete(m: &Mesh, r: &Mesh)
+    requires
+        vertex_count(r) == vertex_count(m),
+        edge_count(r) == edge_count(m),
+        face_count(r) == face_count(m),
+    ensures
+        euler_characteristic_spec(r) == euler_characteristic_spec(m),
+{
+    lemma_flip_edge_preserves_euler(m, r);
+}
+
+// =============================================================================
+// Topological sphere (Tier 4a)
+// =============================================================================
+
+/// A mesh is a topological sphere: structurally valid, closed, connected, chi = 2.
+pub open spec fn is_topological_sphere(m: &Mesh) -> bool {
+    &&& structurally_valid(m)
+    &&& is_closed(m)
+    &&& is_connected(m)
+    &&& euler_characteristic_spec(m) == 2
+}
+
+/// Runtime checker for topological sphere classification.
+pub fn check_topological_sphere(m: &Mesh) -> (out: bool)
+    requires
+        structurally_valid(m),
+    ensures
+        out ==> is_topological_sphere(m),
+{
+    proof { lemma_structurally_valid_is_closed(m); }
+    let connected = check_connected(m);
+    if !connected {
+        return false;
+    }
+
+    let vcnt = m.vertex_half_edges.len();
+    let ecnt = m.edge_half_edges.len();
+    let fcnt = m.face_half_edges.len();
+
+    // Overflow guards for euler_characteristic
+    if vcnt >= isize::MAX as usize {
+        return false;
+    }
+    if ecnt >= isize::MAX as usize {
+        return false;
+    }
+    if fcnt >= isize::MAX as usize {
+        return false;
+    }
+
+    let v = vcnt as isize;
+    let e = ecnt as isize;
+    let f = fcnt as isize;
+
+    // v - e is safe: both < MAX, so v - e > -(MAX-1) > MIN
+    let ve = v - e;
+    // Overflow guard for ve + f
+    if ve > 0 && f > isize::MAX - ve {
+        return false;
+    }
+
+    let chi = euler_characteristic(m);
+    chi == 2
+}
+
+/// A tetrahedron is a topological sphere.
+pub proof fn lemma_tetrahedron_is_sphere(m: &Mesh)
+    requires
+        structurally_valid(m),
+        is_connected(m),
+        vertex_count(m) == 4,
+        edge_count(m) == 6,
+        face_count(m) == 4,
+    ensures
+        is_topological_sphere(m),
+{
+    lemma_structurally_valid_is_closed(m);
+    lemma_tetrahedron_euler(m);
+}
+
+/// A cube is a topological sphere.
+pub proof fn lemma_cube_is_sphere(m: &Mesh)
+    requires
+        structurally_valid(m),
+        is_connected(m),
+        vertex_count(m) == 8,
+        edge_count(m) == 12,
+        face_count(m) == 6,
+    ensures
+        is_topological_sphere(m),
+{
+    lemma_structurally_valid_is_closed(m);
+    lemma_cube_euler(m);
+}
+
+/// Midpoint subdivision preserves sphere topology.
+pub proof fn lemma_subdivision_preserves_sphere(m: &Mesh, r: &Mesh)
+    requires
+        is_topological_sphere(m),
+        all_faces_triangles(m),
+        structurally_valid(r),
+        is_connected(r),
+        vertex_count(r) == subdivision_vertex_count(m),
+        edge_count(r) == subdivision_edge_count(m),
+        face_count(r) == subdivision_face_count(m),
+    ensures
+        is_topological_sphere(r),
+{
+    lemma_structurally_valid_is_closed(r);
+    lemma_subdivision_preserves_euler(m);
 }
 
 } // verus!

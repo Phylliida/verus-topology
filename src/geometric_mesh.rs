@@ -194,6 +194,49 @@ pub proof fn lemma_twin_reverses_edge_direction<T: OrderedRing>(
 }
 
 // =============================================================================
+// 7.4b Twin orientation flip (2D)
+// =============================================================================
+
+/// Twin traversal flips the orient2d sign for any third point p.
+///
+/// Since twin swaps from/to, orient2d(from(twin), to(twin), p)
+/// has opposite sign to orient2d(from(h), to(h), p).
+pub proof fn lemma_twin_orientation_flip_2d<T: OrderedRing>(
+    m: &Mesh, pos: Seq<Point2<T>>, h: int, p: Point2<T>,
+)
+    requires
+        geometric_embedding_2d(m, pos),
+        0 <= h < half_edge_count(m),
+    ensures
+        orient2d_sign(
+            he_from_pos_2d(m, pos, m.half_edges@[h].twin as int),
+            he_to_pos_2d(m, pos, m.half_edges@[h].twin as int),
+            p,
+        ) == match orient2d_sign(
+            he_from_pos_2d(m, pos, h),
+            he_to_pos_2d(m, pos, h),
+            p,
+        ) {
+            OrientationSign::Positive => OrientationSign::Negative,
+            OrientationSign::Negative => OrientationSign::Positive,
+            OrientationSign::Zero => OrientationSign::Zero,
+        },
+{
+    // Twin swaps from/to
+    lemma_twin_reverses_edge_direction(m, pos, h);
+    let from_h = he_from_pos_2d(m, pos, h);
+    let to_h = he_to_pos_2d(m, pos, h);
+    let t = m.half_edges@[h].twin as int;
+
+    // from(twin) == to(h), to(twin) == from(h)
+    assert(he_from_pos_2d(m, pos, t) == to_h);
+    assert(he_to_pos_2d(m, pos, t) == from_h);
+
+    // orient2d_sign(to_h, from_h, p) flips orient2d_sign(from_h, to_h, p)
+    lemma_orient2d_sign_swap_ab::<T>(from_h, to_h, p);
+}
+
+// =============================================================================
 // 7.5 Face outward normal (3D)
 // =============================================================================
 
