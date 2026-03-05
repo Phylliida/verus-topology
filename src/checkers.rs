@@ -2,6 +2,7 @@ use vstd::prelude::*;
 use crate::mesh::*;
 use crate::iteration::*;
 use crate::invariants::*;
+use crate::checker_proofs::*;
 
 verus! {
 
@@ -633,178 +634,19 @@ pub fn check_face_cycles(m: &Mesh) -> (out: bool)
             let _ = (h_prev, steps_prev);
 
             proof {
-                assert(steps == steps_prev + 1);
-                assert(h_prev as int == next_iter(m, start as int, steps_prev as nat));
-                assert(!local_seen_before[h_prev as int]);
-
-                lemma_next_iter_step(m, start as int, steps_prev as nat);
-                assert(0 <= h_prev as int);
-                assert((h_prev as int) < (hcnt as int));
-                assert((m.half_edges@[h_prev as int].next as int) < hcnt as int);
-                assert(next_or_self(m, h_prev as int) == m.half_edges@[h_prev as int].next as int);
+                assert(0 <= h_prev as int && (h_prev as int) < local_seen_before.len());
+                assert(local_seen@ == local_seen_before.update(h_prev as int, true));
+                assert(global_seen@ == global_seen_before_iter.update(h_prev as int, true));
+                lemma_face_cycle_step(
+                    m,
+                    start as int, h_prev as int,
+                    steps_prev as int, steps as int,
+                    f as int, hcnt as int,
+                    local_seen_before, local_seen@,
+                    global_seen_before, global_seen_before_iter, global_seen@,
+                );
+                assert(h as int == m.half_edges@[h_prev as int].next as int);
                 assert(h as int == next_iter(m, start as int, steps as nat));
-                assert(forall|i: int|
-                    0 <= i < steps as int ==> #[trigger] m.half_edges@[next_iter(
-                        m,
-                        start as int,
-                        i as nat,
-                    )].face as int == f as int) by {
-                    assert forall|i: int|
-                        0 <= i < steps as int implies #[trigger] m.half_edges@[next_iter(
-                            m,
-                            start as int,
-                            i as nat,
-                        )].face as int == f as int by {
-                        if i < steps_prev as int {
-                            assert((#[trigger] m.half_edges@[next_iter(
-                                m,
-                                start as int,
-                                i as nat,
-                            )].face as int) == f as int);
-                        } else {
-                            assert(i == steps_prev as int);
-                            assert(next_iter(m, start as int, i as nat)
-                                == next_iter(m, start as int, steps_prev as nat));
-                            assert(next_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            assert((m.half_edges@[h_prev as int].face as int) == f as int);
-                            assert((#[trigger] m.half_edges@[next_iter(
-                                m,
-                                start as int,
-                                i as nat,
-                            )].face as int) == f as int);
-                        }
-                    };
-                };
-                assert(forall|hp: int|
-                    0 <= hp < hcnt as int && #[trigger] local_seen@[hp]
-                        ==> exists|i: int| {
-                            &&& 0 <= i < steps as int
-                            &&& #[trigger] next_iter(m, start as int, i as nat) == hp
-                        }) by {
-                    assert forall|hp: int|
-                        0 <= hp < hcnt as int && #[trigger] local_seen@[hp]
-                            implies exists|i: int| {
-                                &&& 0 <= i < steps as int
-                                &&& #[trigger] next_iter(m, start as int, i as nat) == hp
-                            } by {
-                        if hp == h_prev as int {
-                            let i = steps_prev as int;
-                            assert(0 <= i < steps as int);
-                            assert(next_iter(m, start as int, i as nat) == hp);
-                        } else {
-                            assert(local_seen@[hp] == local_seen_before[hp]);
-                            assert(local_seen_before[hp]);
-                            assert(exists|i: int| {
-                                &&& 0 <= i < steps_prev as int
-                                &&& #[trigger] next_iter(m, start as int, i as nat) == hp
-                            });
-                            let i = choose|i: int| {
-                                &&& 0 <= i < steps_prev as int
-                                &&& #[trigger] next_iter(m, start as int, i as nat) == hp
-                            };
-                            assert(0 <= i < steps as int);
-                            assert(next_iter(m, start as int, i as nat) == hp);
-                        }
-                    };
-                };
-                assert(forall|hp: int|
-                    0 <= hp < hcnt as int && #[trigger] local_seen@[hp] ==> #[trigger] global_seen@[hp]) by {
-                    assert forall|hp: int|
-                        0 <= hp < hcnt as int && #[trigger] local_seen@[hp]
-                            implies #[trigger] global_seen@[hp] by {
-                        if hp == h_prev as int {
-                        } else {
-                            assert(local_seen@[hp] == local_seen_before[hp]);
-                            assert(global_seen@[hp] == global_seen_before_iter[hp]);
-                            assert(local_seen_before[hp]);
-                            assert(global_seen_before_iter[hp]);
-                        }
-                    };
-                };
-                assert(forall|hp: int|
-                    0 <= hp < hcnt as int && !local_seen@[hp] ==> global_seen@[hp] == global_seen_before[hp]) by {
-                    assert forall|hp: int|
-                        0 <= hp < hcnt as int && !local_seen@[hp]
-                            implies global_seen@[hp] == global_seen_before[hp] by {
-                        if hp == h_prev as int {
-                            assert(local_seen@[hp]);
-                        } else {
-                            assert(local_seen@[hp] == local_seen_before[hp]);
-                            assert(!local_seen_before[hp]);
-                            assert(global_seen@[hp] == global_seen_before_iter[hp]);
-                            assert(global_seen_before_iter[hp] == global_seen_before[hp]);
-                        }
-                    };
-                };
-                assert(forall|i: int|
-                    0 <= i < steps as int ==> #[trigger] local_seen@[next_iter(
-                        m,
-                        start as int,
-                        i as nat,
-                    )]) by {
-                    assert forall|i: int|
-                        0 <= i < steps as int implies #[trigger] local_seen@[next_iter(
-                            m,
-                            start as int,
-                            i as nat,
-                        )] by {
-                        if i < steps_prev as int {
-                            let hi = next_iter(m, start as int, i as nat);
-                            assert(half_edge_count(m) == hcnt as int);
-                            assert(0 <= start as int);
-                            assert((start as int) < half_edge_count(m));
-                            lemma_next_iter_in_bounds(m, start as int, i as nat);
-                            assert(0 <= hi);
-                            assert(hi < hcnt as int);
-                            assert(local_seen_before[hi]);
-                            if hi == h_prev as int {
-                                assert(local_seen@[hi]);
-                            } else {
-                                assert(hi != h_prev as int);
-                                assert(local_seen@[hi] == local_seen_before[hi]);
-                                assert(local_seen@[hi]);
-                            }
-                        } else {
-                            assert(i == steps_prev as int);
-                            assert(next_iter(m, start as int, i as nat)
-                                == next_iter(m, start as int, steps_prev as nat));
-                            assert(next_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            assert(local_seen@[h_prev as int]);
-                        }
-                    };
-                };
-                assert(forall|i: int, j: int|
-                    #![trigger next_iter(m, start as int, i as nat), next_iter(m, start as int, j as nat)]
-                    0 <= i < j < steps as int
-                        ==> next_iter(m, start as int, i as nat)
-                            != next_iter(m, start as int, j as nat)) by {
-                    assert forall|i: int, j: int|
-                        #![trigger next_iter(m, start as int, i as nat), next_iter(m, start as int, j as nat)]
-                        0 <= i < j < steps as int
-                            implies next_iter(m, start as int, i as nat)
-                                != next_iter(m, start as int, j as nat) by {
-                        if j < steps_prev as int {
-                            assert(next_iter(m, start as int, i as nat)
-                                != next_iter(m, start as int, j as nat));
-                        } else {
-                            assert(j == steps_prev as int);
-                            assert(next_iter(m, start as int, j as nat)
-                                == next_iter(m, start as int, steps_prev as nat));
-                            assert(next_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            let hi = next_iter(m, start as int, i as nat);
-                            assert(local_seen_before[hi]);
-                            if hi == h_prev as int {
-                                assert(local_seen_before[h_prev as int]);
-                                assert(false);
-                            }
-                            assert(hi != h_prev as int);
-                            assert(hi != next_iter(m, start as int, j as nat));
-                        }
-                    };
-                };
             }
 
             if h == start {
@@ -1401,149 +1243,17 @@ pub fn check_vertex_manifold(m: &Mesh) -> (out: bool)
             let _ = (h_prev, steps_prev);
 
             proof {
-                assert(steps == steps_prev + 1);
-                assert(h_prev as int == vertex_ring_iter(m, start as int, steps_prev as nat));
+                assert(0 <= h_prev as int && (h_prev as int) < local_seen_before.len());
                 assert(local_seen@ == local_seen_before.update(h_prev as int, true));
-
-                assert(0 <= h_prev as int);
-                assert((h_prev as int) < (hcnt as int));
-                assert((m.half_edges@[h_prev as int].twin as int) < hcnt as int);
-                assert((m.half_edges@[m.half_edges@[h_prev as int].twin as int].next as int) < hcnt as int);
-                assert(vertex_ring_succ_or_self(m, h_prev as int)
-                    == m.half_edges@[m.half_edges@[h_prev as int].twin as int].next as int);
-                lemma_vertex_ring_iter_step(m, start as int, steps_prev as nat);
+                lemma_vertex_ring_step(
+                    m,
+                    start as int, h_prev as int,
+                    steps_prev as int, steps as int,
+                    v as int, hcnt as int,
+                    local_seen_before, local_seen@,
+                );
+                assert(h as int == m.half_edges@[m.half_edges@[h_prev as int].twin as int].next as int);
                 assert(h as int == vertex_ring_iter(m, start as int, steps as nat));
-                assert(forall|i: int|
-                    0 <= i < steps as int ==> #[trigger] m.half_edges@[vertex_ring_iter(
-                        m,
-                        start as int,
-                        i as nat,
-                    )].vertex as int == v as int) by {
-                    assert forall|i: int|
-                        0 <= i < steps as int implies #[trigger] m.half_edges@[vertex_ring_iter(
-                            m,
-                            start as int,
-                            i as nat,
-                        )].vertex as int == v as int by {
-                        if i < steps_prev as int {
-                            assert((#[trigger] m.half_edges@[vertex_ring_iter(
-                                m,
-                                start as int,
-                                i as nat,
-                            )].vertex as int) == v as int);
-                        } else {
-                            assert(i == steps_prev as int);
-                            assert(vertex_ring_iter(m, start as int, i as nat)
-                                == vertex_ring_iter(m, start as int, steps_prev as nat));
-                            assert(vertex_ring_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            assert((m.half_edges@[h_prev as int].vertex as int) == v as int);
-                            assert((#[trigger] m.half_edges@[vertex_ring_iter(
-                                m,
-                                start as int,
-                                i as nat,
-                            )].vertex as int) == v as int);
-                        }
-                    };
-                };
-                assert(forall|i: int|
-                    0 <= i < steps as int ==> #[trigger] local_seen@[vertex_ring_iter(
-                        m,
-                        start as int,
-                        i as nat,
-                    )]) by {
-                    assert forall|i: int|
-                        0 <= i < steps as int implies #[trigger] local_seen@[vertex_ring_iter(
-                            m,
-                            start as int,
-                            i as nat,
-                        )] by {
-                        if i < steps_prev as int {
-                            let hi = vertex_ring_iter(m, start as int, i as nat);
-                            lemma_vertex_ring_iter_in_bounds(m, start as int, i as nat);
-                            assert(0 <= hi < hcnt as int);
-                            assert(local_seen_before[hi]);
-                            if hi == h_prev as int {
-                                assert(local_seen@[hi]);
-                            } else {
-                                assert(local_seen@[hi]
-                                    == local_seen_before.update(h_prev as int, true)[hi]);
-                                assert(local_seen_before.update(h_prev as int, true)[hi]
-                                    == local_seen_before[hi]);
-                                assert(local_seen@[hi]);
-                            }
-                        } else {
-                            assert(i == steps_prev as int);
-                            assert(vertex_ring_iter(m, start as int, i as nat)
-                                == vertex_ring_iter(m, start as int, steps_prev as nat));
-                            assert(vertex_ring_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            assert(local_seen@[h_prev as int]);
-                            assert(local_seen@[vertex_ring_iter(m, start as int, i as nat)]);
-                        }
-                    };
-                };
-                assert(forall|hp: int|
-                    0 <= hp < hcnt as int && #[trigger] local_seen@[hp]
-                        ==> exists|i: int| {
-                            &&& 0 <= i < steps as int
-                            &&& #[trigger] vertex_ring_iter(m, start as int, i as nat) == hp
-                        }) by {
-                    assert forall|hp: int|
-                        0 <= hp < hcnt as int && #[trigger] local_seen@[hp]
-                            implies exists|i: int| {
-                                &&& 0 <= i < steps as int
-                                &&& #[trigger] vertex_ring_iter(m, start as int, i as nat) == hp
-                            } by {
-                        if hp == h_prev as int {
-                            let i = steps_prev as int;
-                            assert(0 <= i < steps as int);
-                            assert(vertex_ring_iter(m, start as int, i as nat) == hp);
-                        } else {
-                            assert(local_seen@[hp] == local_seen_before[hp]);
-                            assert(local_seen_before[hp]);
-                            assert(exists|i: int| {
-                                &&& 0 <= i < steps_prev as int
-                                &&& #[trigger] vertex_ring_iter(m, start as int, i as nat) == hp
-                            });
-                            let i = choose|i: int| {
-                                &&& 0 <= i < steps_prev as int
-                                &&& #[trigger] vertex_ring_iter(m, start as int, i as nat) == hp
-                            };
-                            assert(0 <= i < steps as int);
-                            assert(vertex_ring_iter(m, start as int, i as nat) == hp);
-                        }
-                    };
-                };
-                assert(forall|i: int, j: int|
-                    #![trigger vertex_ring_iter(m, start as int, i as nat), vertex_ring_iter(m, start as int, j as nat)]
-                    0 <= i < j < steps as int
-                        ==> vertex_ring_iter(m, start as int, i as nat)
-                            != vertex_ring_iter(m, start as int, j as nat)) by {
-                    assert forall|i: int, j: int|
-                        #![trigger vertex_ring_iter(m, start as int, i as nat), vertex_ring_iter(m, start as int, j as nat)]
-                        0 <= i < j < steps as int
-                            implies vertex_ring_iter(m, start as int, i as nat)
-                                != vertex_ring_iter(m, start as int, j as nat) by {
-                        if j < steps_prev as int {
-                        } else {
-                            assert(j == steps_prev as int);
-                            assert(i < steps_prev as int);
-                            assert(local_seen_before[vertex_ring_iter(
-                                m,
-                                start as int,
-                                i as nat,
-                            )]);
-                            assert(!local_seen_before[h_prev as int]);
-                            assert(vertex_ring_iter(m, start as int, j as nat)
-                                == vertex_ring_iter(m, start as int, steps_prev as nat));
-                            assert(vertex_ring_iter(m, start as int, steps_prev as nat)
-                                == h_prev as int);
-                            assert(vertex_ring_iter(m, start as int, i as nat)
-                                != vertex_ring_iter(m, start as int, j as nat));
-                        }
-                    };
-                };
             }
 
             if h == start {
@@ -1947,118 +1657,21 @@ pub fn check_edge_twin_duality(m: &Mesh) -> (out: bool)
 
         if ok && edge_ok {
             proof {
-                assert(edge_exactly_two_half_edges_at(m, e as int)) by {
-                    let w0 = h0 as int;
-                    let w1 = h1 as int;
-                    assert(0 <= w0 < hcnt as int);
-                    assert(0 <= w1 < hcnt as int);
-                    assert(w0 != w1);
-                    assert((m.half_edges@[w0].edge as int) == e as int);
-                    assert((m.half_edges@[w1].edge as int) == e as int);
-                    assert((m.half_edges@[w0].twin as int) == w1);
-                    assert((m.half_edges@[w1].twin as int) == w0);
-                    assert((m.edge_half_edges@[e as int] as int) == w0 || (m.edge_half_edges@[e as int] as int) == w1);
-                    assert(!too_many && count == 2);
-                    assert(forall|j: int|
-                        0 <= j < hcnt as int && (#[trigger] m.half_edges@[j].edge as int) == e as int
-                            ==> (j == w0 || j == w1));
-                }
+                lemma_prove_edge_exactly_two_at(
+                    m, e as int, h0 as int, h1 as int, hcnt as int,
+                );
             }
         } else {
             if ok {
                 bad_e = e;
                 proof {
                     assert(h == hcnt);
-                    assert(!edge_ok);
-                    assert(!edge_exactly_two_half_edges_at(m, e as int)) by {
-                        if edge_exactly_two_half_edges_at(m, e as int) {
-                            let (w0, w1) = choose|w0: int, w1: int| {
-                                &&& 0 <= w0 < hcnt as int
-                                &&& 0 <= w1 < hcnt as int
-                                &&& w0 != w1
-                                &&& (#[trigger] m.half_edges@[w0].edge as int) == e as int
-                                &&& (#[trigger] m.half_edges@[w1].edge as int) == e as int
-                                &&& (m.half_edges@[w0].twin as int) == w1
-                                &&& (m.half_edges@[w1].twin as int) == w0
-                                &&& ((m.edge_half_edges@[e as int] as int) == w0 || (m.edge_half_edges@[e as int] as int) == w1)
-                                &&& forall|hh: int|
-                                    0 <= hh < hcnt as int && (#[trigger] m.half_edges@[hh].edge as int) == e as int
-                                        ==> (hh == w0 || hh == w1)
-                            };
-
-                            if too_many {
-                                let i0 = h0 as int;
-                                let i1 = h1 as int;
-                                let i2 = h2 as int;
-                                assert(count == 2);
-                                assert(0 <= i0 < hcnt as int);
-                                assert(0 <= i1 < hcnt as int);
-                                assert(0 <= i2 < hcnt as int);
-                                assert(i0 != i1);
-                                assert(i2 != i0);
-                                assert(i2 != i1);
-                                assert((m.half_edges@[i0].edge as int) == e as int);
-                                assert((m.half_edges@[i1].edge as int) == e as int);
-                                assert((m.half_edges@[i2].edge as int) == e as int);
-                                assert(i0 == w0 || i0 == w1);
-                                assert(i1 == w0 || i1 == w1);
-                                assert(i2 == w0 || i2 == w1);
-                                if i0 == w0 {
-                                    assert(i1 == w1);
-                                    assert(i2 == w0 || i2 == w1);
-                                    assert(i2 == i0 || i2 == i1);
-                                } else {
-                                    assert(i0 == w1);
-                                    assert(i1 == w0);
-                                    assert(i2 == w0 || i2 == w1);
-                                    assert(i2 == i0 || i2 == i1);
-                                }
-                                assert(false);
-                            } else if count == 0 {
-                                assert(0 <= w0 < h as int);
-                                assert((m.half_edges@[w0].edge as int) != e as int);
-                                assert(false);
-                            } else if count == 1 {
-                                let i0 = h0 as int;
-                                assert(0 <= i0 < hcnt as int);
-                                assert((m.half_edges@[i0].edge as int) == e as int);
-                                assert(w0 == i0);
-                                assert(w1 == i0);
-                                assert(false);
-                            } else {
-                                assert(count == 2);
-                                assert(count_two);
-                                let i0 = h0 as int;
-                                let i1 = h1 as int;
-                                assert(0 <= i0 < hcnt as int);
-                                assert(0 <= i1 < hcnt as int);
-                                assert(i0 != i1);
-                                assert((m.half_edges@[i0].edge as int) == e as int);
-                                assert((m.half_edges@[i1].edge as int) == e as int);
-                                assert(w0 == i0 || w0 == i1);
-                                assert(w1 == i0 || w1 == i1);
-                                assert(w0 != w1);
-                                if w0 == i0 {
-                                    assert(w1 == i1);
-                                    assert((m.half_edges@[i0].twin as int) == i1);
-                                    assert((m.half_edges@[i1].twin as int) == i0);
-                                    assert((m.edge_half_edges@[e as int] as int) == i0 || (m.edge_half_edges@[e as int] as int) == i1);
-                                } else {
-                                    assert(w0 == i1);
-                                    assert(w1 == i0);
-                                    assert((m.half_edges@[i0].twin as int) == i1);
-                                    assert((m.half_edges@[i1].twin as int) == i0);
-                                    assert((m.edge_half_edges@[e as int] as int) == i0 || (m.edge_half_edges@[e as int] as int) == i1);
-                                }
-                                assert(twin0 == h1 && twin1 == h0);
-                                assert(rep == h0 || rep == h1);
-                                assert(twins_ok);
-                                assert(rep_ok);
-                                assert(edge_ok);
-                                assert(false);
-                            }
-                        }
-                    };
+                    lemma_disprove_edge_exactly_two_at(
+                        m, e as int,
+                        h0 as int, h1 as int, h2 as int,
+                        count as int, too_many, count_two, twins_ok, rep_ok,
+                        hcnt as int,
+                    );
                 }
             }
             ok = false;

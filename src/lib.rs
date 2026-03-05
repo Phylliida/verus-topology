@@ -32,4 +32,7 @@ pub mod construction_proofs;
 pub mod connectivity;
 
 #[cfg(verus_keep_ghost)]
+pub mod checker_proofs;
+
+#[cfg(verus_keep_ghost)]
 pub mod geometric_checkers;
