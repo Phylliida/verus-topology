@@ -116,13 +116,13 @@ wall = int(sys.argv[3])
 with open(json_path) as f:
     raw = f.read().strip()
 
-# The JSON object may be preceded by compiler output lines (e.g. "Compiling ...").
-# Find the first '{' to locate the start of the JSON blob.
+# The JSON object may be preceded/followed by compiler output lines.
+# Find the first '{' and use raw_decode to parse just the JSON object.
 json_start = raw.find('{')
 if json_start < 0:
     print(f"error: no JSON object found in output. Raw output:\n{raw[:500]}", file=sys.stderr)
     sys.exit(1)
-data = json.loads(raw[json_start:])
+data, _ = json.JSONDecoder().raw_decode(raw, json_start)
 
 times = data.get("times-ms", {})
 smt = times.get("smt", {})

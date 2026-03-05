@@ -42,6 +42,63 @@ pub open spec fn positions_wf_3d(pos: &Vec<RuntimePoint3>) -> bool {
 }
 
 // =============================================================================
+// Proof helpers (isolated to reduce Z3 context in loops)
+// =============================================================================
+
+/// Bridge: orient2d_sign_exec result == Positive implies face_oriented_ccw_2d.
+proof fn lemma_orient2d_positive_implies_face_ccw(
+    m: &Mesh, pos: &Vec<RuntimePoint2>,
+    f: int, v0: int, v1: int, v2: int,
+)
+    requires
+        index_bounds(m),
+        0 <= f < face_count(m),
+        pos@.len() == vertex_count(m),
+        0 <= v0 < vertex_count(m),
+        0 <= v1 < vertex_count(m),
+        0 <= v2 < vertex_count(m),
+        m.half_edges@[m.face_half_edges@[f] as int].vertex as int == v0,
+        m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].vertex as int == v1,
+        m.half_edges@[m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].next as int].vertex as int == v2,
+        orient2d_sign::<RationalModel>(pos@[v0]@, pos@[v1]@, pos@[v2]@)
+            == OrientationSign::Positive,
+    ensures
+        face_oriented_ccw_2d::<RationalModel>(m, pos_view_2d(pos), f),
+{
+    let pv = pos_view_2d(pos);
+    assert(pv[v0] == pos@[v0]@);
+    assert(pv[v1] == pos@[v1]@);
+    assert(pv[v2] == pos@[v2]@);
+}
+
+/// Bridge: orient3d_sign_exec result == Negative implies face_outward_normal_3d.
+proof fn lemma_orient3d_negative_implies_face_outward(
+    m: &Mesh, pos: &Vec<RuntimePoint3>,
+    f: int, v0: int, v1: int, v2: int,
+    interior: Point3<RationalModel>,
+)
+    requires
+        index_bounds(m),
+        0 <= f < face_count(m),
+        pos@.len() == vertex_count(m),
+        0 <= v0 < vertex_count(m),
+        0 <= v1 < vertex_count(m),
+        0 <= v2 < vertex_count(m),
+        m.half_edges@[m.face_half_edges@[f] as int].vertex as int == v0,
+        m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].vertex as int == v1,
+        m.half_edges@[m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].next as int].vertex as int == v2,
+        orient3d_sign::<RationalModel>(pos@[v0]@, pos@[v1]@, pos@[v2]@, interior)
+            == OrientationSign::Negative,
+    ensures
+        face_outward_normal_3d::<RationalModel>(m, pos_view_3d(pos), f, interior),
+{
+    let pv = pos_view_3d(pos);
+    assert(pv[v0] == pos@[v0]@);
+    assert(pv[v1] == pos@[v1]@);
+    assert(pv[v2] == pos@[v2]@);
+}
+
+// =============================================================================
 // 2D consistent orientation checker
 // =============================================================================
 
@@ -56,19 +113,15 @@ pub fn check_consistently_oriented_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (ou
 {
     proof { assert(index_bounds(m)); }
     let fcnt = m.face_half_edges.len();
-    let hcnt = m.half_edges.len();
-    let vcnt = m.vertex_half_edges.len();
     let mut f: usize = 0;
 
     while f < fcnt
         invariant
             index_bounds(m),
             pos@.len() == vertex_count(m),
-            positions_wf_2d(pos),
             0 <= f <= fcnt,
             fcnt == face_count(m),
-            hcnt == half_edge_count(m),
-            vcnt == vertex_count(m),
+            positions_wf_2d(pos),
             forall|ff: int| 0 <= ff < f as int
                 ==> face_oriented_ccw_2d::<RationalModel>(m, pos_view_2d(pos), ff),
         decreases fcnt - f,
@@ -82,16 +135,11 @@ pub fn check_consistently_oriented_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (ou
 
         let sign = orient2d_sign_exec(&pos[v0], &pos[v1], &pos[v2]);
 
-        // Use match to give Z3 the spec-level equality
         match sign {
             OrientationSign::Positive => {
                 proof {
-                    let pv = pos_view_2d(pos);
-                    // Seq::new unfolds at specific indices
-                    assert(pv[v0 as int] == pos@[v0 as int]@);
-                    assert(pv[v1 as int] == pos@[v1 as int]@);
-                    assert(pv[v2 as int] == pos@[v2 as int]@);
-                    assert(face_oriented_ccw_2d::<RationalModel>(m, pv, f as int));
+                    lemma_orient2d_positive_implies_face_ccw(
+                        m, pos, f as int, v0 as int, v1 as int, v2 as int);
                 }
             }
             _ => { return false; }
@@ -123,8 +171,6 @@ pub fn check_consistently_oriented_3d(
 {
     proof { assert(index_bounds(m)); }
     let fcnt = m.face_half_edges.len();
-    let hcnt = m.half_edges.len();
-    let vcnt = m.vertex_half_edges.len();
     let mut f: usize = 0;
 
     while f < fcnt
@@ -135,8 +181,6 @@ pub fn check_consistently_oriented_3d(
             interior.wf_spec(),
             0 <= f <= fcnt,
             fcnt == face_count(m),
-            hcnt == half_edge_count(m),
-            vcnt == vertex_count(m),
             forall|ff: int| 0 <= ff < f as int
                 ==> face_outward_normal_3d::<RationalModel>(m, pos_view_3d(pos), ff, interior@),
         decreases fcnt - f,
@@ -153,11 +197,8 @@ pub fn check_consistently_oriented_3d(
         match sign {
             OrientationSign::Negative => {
                 proof {
-                    let pv = pos_view_3d(pos);
-                    assert(pv[v0 as int] == pos@[v0 as int]@);
-                    assert(pv[v1 as int] == pos@[v1 as int]@);
-                    assert(pv[v2 as int] == pos@[v2 as int]@);
-                    assert(face_outward_normal_3d::<RationalModel>(m, pv, f as int, interior@));
+                    lemma_orient3d_negative_implies_face_outward(
+                        m, pos, f as int, v0 as int, v1 as int, v2 as int, interior@);
                 }
             }
             _ => { return false; }
