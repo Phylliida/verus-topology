@@ -3,6 +3,7 @@ use crate::mesh::*;
 use crate::invariants::*;
 use crate::queries::*;
 use crate::euler_ops::*;
+use crate::checkers::*;
 
 verus! {
 
@@ -30,40 +31,21 @@ pub open spec fn subdivision_face_count(m: &Mesh) -> int {
 // 6.1 midpoint_subdivide
 // =============================================================================
 
-/// Each triangle → 4 triangles via midpoint subdivision.
-///
-/// Algorithm:
-/// (a) Split all E0 original edges (adding E0 new vertices).
-/// (b) For each original face (now a hexagon with 3 old + 3 new vertices
-///     alternating), call split_face 3 times to create 4 triangles.
+/// Build helper: runs the subdivision algorithm without proving postconditions.
 #[verifier::exec_allows_no_decreases_clause]
-pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
+fn midpoint_subdivide_build(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     requires
-        structurally_valid(&mesh),
-        all_faces_triangles(&mesh),
-    ensures
-        result is Ok ==> structurally_valid(&result->Ok_0),
-        result is Ok ==> all_faces_triangles(&result->Ok_0),
-        result is Ok ==> vertex_count(&result->Ok_0)
-            == vertex_count(&mesh) + edge_count(&mesh),
-        result is Ok ==> face_count(&result->Ok_0)
-            == 4 * face_count(&mesh),
+        index_bounds(&mesh),
 {
-    proof {
-        assume(false); // deferred: midpoint_subdivide correctness
-    }
-
     let orig_ecnt = mesh.edge_half_edges.len();
     let orig_fcnt = mesh.face_half_edges.len();
 
     // Phase (a): Split all original edges.
-    // We split edges 0..orig_ecnt-1. After each split, edge count increases by 1.
-    // We must track which edge index to split next.
     let mut m = mesh;
     let mut ei: usize = 0;
     while ei < orig_ecnt
         invariant
-            structurally_valid(&m),
+            index_bounds(&m),
             ei <= orig_ecnt + 1,
             edge_count(&m) >= ei as int,
     {
@@ -82,12 +64,10 @@ pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     }
 
     // Phase (b): Split each original hexagonal face into 4 triangles.
-    // After phase (a), each original triangle is now a hexagon (6-sided).
-    // Split each hexagon into 4 triangles with 3 diagonal split_face calls.
     let mut fi: usize = 0;
     while fi < orig_fcnt
         invariant
-            structurally_valid(&m),
+            index_bounds(&m),
             0 <= fi <= orig_fcnt,
     {
         m = split_hexagonal_face(m, fi)?;
@@ -97,18 +77,63 @@ pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     Ok(m)
 }
 
-/// Helper: split a hexagonal face (at index fi) into 4 triangles
-/// via 3 calls to split_face.
-fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
+/// Each triangle → 4 triangles via midpoint subdivision.
+///
+/// Algorithm:
+/// (a) Split all E0 original edges (adding E0 new vertices).
+/// (b) For each original face (now a hexagon with 3 old + 3 new vertices
+///     alternating), call split_face 3 times to create 4 triangles.
+pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     requires
         structurally_valid(&mesh),
+        all_faces_triangles(&mesh),
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+        result is Ok ==> all_faces_triangles(&result->Ok_0),
+        result is Ok ==> vertex_count(&result->Ok_0)
+            == vertex_count(&mesh) + edge_count(&mesh),
+        result is Ok ==> face_count(&result->Ok_0)
+            == 4 * face_count(&mesh),
+{
+    let orig_vcnt = mesh.vertex_half_edges.len();
+    let orig_ecnt = mesh.edge_half_edges.len();
+    let orig_fcnt = mesh.face_half_edges.len();
+
+    // Overflow guards for count comparisons
+    if orig_vcnt > usize::MAX - orig_ecnt {
+        return Err(EulerError::Overflow);
+    }
+    if orig_fcnt > usize::MAX / 4 {
+        return Err(EulerError::Overflow);
+    }
+
+    match midpoint_subdivide_build(mesh) {
+        Ok(m) => {
+            if !check_structurally_valid(&m) {
+                return Err(EulerError::ValidationFailed);
+            }
+            if !check_all_faces_triangles(&m) {
+                return Err(EulerError::ValidationFailed);
+            }
+            if m.vertex_half_edges.len() != orig_vcnt + orig_ecnt {
+                return Err(EulerError::ValidationFailed);
+            }
+            if m.face_half_edges.len() != 4 * orig_fcnt {
+                return Err(EulerError::ValidationFailed);
+            }
+            Ok(m)
+        }
+        Err(e) => Err(e),
+    }
+}
+
+/// Phase 1: first diagonal split of a hexagonal face.
+fn split_hex_first(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
     ensures
         result is Ok ==> structurally_valid(&result->Ok_0),
 {
-    proof {
-        assume(false); // deferred
-    }
-
     let hcnt = mesh.half_edges.len();
     let fcnt = mesh.face_half_edges.len();
 
@@ -125,29 +150,36 @@ fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerErr
     let h3 = mesh.half_edges[h2].next;
     if h3 >= hcnt { return Err(EulerError::InvalidIndex); }
 
-    // First split
-    let mut m = split_face(mesh, h1, h3)?;
+    split_face(mesh, h1, h3)
+}
 
-    // Re-walk face fi for second split
-    let hcnt2 = m.half_edges.len();
-    let fcnt2 = m.face_half_edges.len();
-    if fi >= fcnt2 { return Err(EulerError::InvalidIndex); }
-    let ha = m.face_half_edges[fi];
-    if ha >= hcnt2 { return Err(EulerError::InvalidIndex); }
-    let hb = m.half_edges[ha].next;
-    if hb >= hcnt2 { return Err(EulerError::InvalidIndex); }
-    let hc = m.half_edges[hb].next;
-    if hc >= hcnt2 { return Err(EulerError::InvalidIndex); }
-    let hd = m.half_edges[hc].next;
-    if hd >= hcnt2 { return Err(EulerError::InvalidIndex); }
+/// Phase 2: second and third diagonal splits after the first.
+fn split_hex_remaining(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+{
+    let hcnt = mesh.half_edges.len();
+    let fcnt = mesh.face_half_edges.len();
 
-    let he = m.half_edges[hd].next;
+    if fi >= fcnt { return Err(EulerError::InvalidIndex); }
+    let ha = mesh.face_half_edges[fi];
+    if ha >= hcnt { return Err(EulerError::InvalidIndex); }
+    let hb = mesh.half_edges[ha].next;
+    if hb >= hcnt { return Err(EulerError::InvalidIndex); }
+    let hc = mesh.half_edges[hb].next;
+    if hc >= hcnt { return Err(EulerError::InvalidIndex); }
+    let hd = mesh.half_edges[hc].next;
+    if hd >= hcnt { return Err(EulerError::InvalidIndex); }
+
+    let he = mesh.half_edges[hd].next;
     if he == ha {
         // Quad: one more split to get 2 triangles
-        m = split_face(m, ha, hc)?;
+        split_face(mesh, ha, hc)
     } else {
         // Larger: split to reduce, then split remaining quad
-        m = split_face(m, hb, hd)?;
+        let mut m = split_face(mesh, hb, hd)?;
 
         let hcnt3 = m.half_edges.len();
         let fcnt3 = m.face_half_edges.len();
@@ -162,11 +194,22 @@ fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerErr
         if hw >= hcnt3 { return Err(EulerError::InvalidIndex); }
 
         if m.half_edges[hw].next == hx {
-            m = split_face(m, hx, hz)?;
+            split_face(m, hx, hz)
+        } else {
+            Ok(m)
         }
     }
+}
 
-    Ok(m)
+/// Split a hexagonal face into 4 triangles via diagonal splits.
+fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
+    requires
+        index_bounds(&mesh),
+    ensures
+        result is Ok ==> structurally_valid(&result->Ok_0),
+{
+    let m = split_hex_first(mesh, fi)?;
+    split_hex_remaining(m, fi)
 }
 
 // =============================================================================
@@ -202,10 +245,6 @@ pub fn subdivide_n_times(mesh: Mesh, n: usize) -> (result: Result<Mesh, EulerErr
         result is Ok ==> structurally_valid(&result->Ok_0),
         result is Ok ==> all_faces_triangles(&result->Ok_0),
 {
-    proof {
-        assume(false); // deferred: inductive proof
-    }
-
     let mut m = mesh;
     let mut i: usize = 0;
 

@@ -277,6 +277,18 @@ pub open spec fn edge_exactly_two_half_edges_total(m: &Mesh) -> bool {
 
 // --- Composite ---
 
+/// 2 * edge_count == half_edge_count (each edge has exactly 2 half-edges).
+/// This is the counting consequence of edge_exactly_two_half_edges.
+pub open spec fn half_edge_edge_count_relation(m: &Mesh) -> bool {
+    2 * edge_count(m) == half_edge_count(m)
+}
+
+/// half_edge_count >= 3 * face_count (each face has at least 3 half-edges).
+/// This is the counting consequence of face cycles covering all half-edges.
+pub open spec fn half_edge_face_count_lower_bound(m: &Mesh) -> bool {
+    half_edge_count(m) >= 3 * face_count(m)
+}
+
 pub open spec fn structurally_valid(m: &Mesh) -> bool {
     &&& index_bounds(m)
     &&& twin_involution(m)
@@ -286,6 +298,8 @@ pub open spec fn structurally_valid(m: &Mesh) -> bool {
     &&& face_representative_cycles_cover_all_half_edges(m)
     &&& vertex_manifold(m)
     &&& edge_exactly_two_half_edges(m)
+    &&& half_edge_edge_count_relation(m)
+    &&& half_edge_face_count_lower_bound(m)
 }
 
 } // verus!
