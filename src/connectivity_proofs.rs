@@ -2,7 +2,8 @@ use vstd::prelude::*;
 use crate::mesh::*;
 use crate::invariants::*;
 use crate::connectivity::*;
-use crate::euler_ops::{se_h0, se_h1, split_edge_post, split_face_post};
+use crate::euler_ops::{se_h0, se_h1, split_edge_post, split_face_post,
+    fe_h0, fe_h1, fe_a, fe_b, fe_c, fe_d, fe_all_distinct, flip_edge_post};
 
 verus! {
 
@@ -419,6 +420,306 @@ pub proof fn lemma_split_face_preserves_connected(
         assert(vertices_reachable(old_m, u, v));
         let path = choose|p: Seq<int>| vertex_path(old_m, p) && p[0] == u && p[p.len() - 1] == v;
         lemma_split_face_path_valid(old_m, new_m, h_start, h_end, path);
+    }
+}
+
+// =============================================================================
+// 8. flip_edge: old adjacency → reachable in new mesh
+// =============================================================================
+
+/// If u→v is adjacent in old_m, then u and v are reachable in new_m after flip_edge.
+///
+/// Most adjacencies are preserved directly. The only lost adjacency is via h0/h1
+/// (the flipped edge). For h0: old v0→v1, new path v0→v_d→v1 (via c, d).
+/// For h1: old v1→v0, new path v1→v_b→v0 (via a, b).
+proof fn lemma_flip_edge_adj_reachable(
+    old_m: &Mesh, new_m: &Mesh, e: int, u: int, v: int,
+)
+    requires
+        structurally_valid(old_m),
+        flip_edge_post(old_m, new_m, e),
+        0 <= e < edge_count(old_m),
+        fe_all_distinct(old_m, e),
+        // Triangle conditions
+        old_m.half_edges@[fe_b(old_m, e)].next as int == fe_h0(old_m, e),
+        old_m.half_edges@[fe_d(old_m, e)].next as int == fe_h1(old_m, e),
+        adjacent_vertices(old_m, u, v),
+    ensures
+        vertices_reachable(new_m, u, v),
+{
+    let h0 = fe_h0(old_m, e);
+    let h1 = fe_h1(old_m, e);
+    let a = fe_a(old_m, e);
+    let b = fe_b(old_m, e);
+    let c = fe_c(old_m, e);
+    let d = fe_d(old_m, e);
+    let hcnt = half_edge_count(old_m);
+    let v_b = old_m.half_edges@[b].vertex as int;
+    let v_d = old_m.half_edges@[d].vertex as int;
+
+    // Get witness hw for adjacency u→v in old_m
+    let hw = choose|h: int| 0 <= h < hcnt
+        && old_m.half_edges@[h].vertex as int == u
+        && old_m.half_edges@[old_m.half_edges@[h].next as int].vertex as int == v;
+
+    if hw != h0 && hw != h1 && hw != a && hw != b && hw != c && hw != d {
+        // --- Case 1: hw not in modified set → adjacency preserved directly ---
+        // vertex(hw) preserved
+        assert(new_m.half_edges@[hw].vertex == old_m.half_edges@[hw].vertex);
+        // next(hw) preserved
+        assert(new_m.half_edges@[hw].next == old_m.half_edges@[hw].next);
+        let nxt = old_m.half_edges@[hw].next as int;
+        // Show nxt ∉ {h0, h1}: prev is the inverse of next, so
+        // nxt = h0 iff hw = prev(h0) = b, nxt = h1 iff hw = prev(h1) = d
+        assert(prev_next_bidirectional(old_m));
+        assert(next_prev_inverse_at(old_m, h0));  // prev(next(h0)) = h0
+        assert(next_prev_inverse_at(old_m, h1));
+
+        // vertex(nxt) preserved: nxt ∉ {h0, h1} since hw ∉ {b, d}
+        // From prev_next_bidirectional at h0: old_m.half_edges@[old_m.half_edges@[h0].next].prev == h0
+        // So prev(a) = h0. If nxt = h0 then hw = prev(h0).
+        // From triangle: next(b) = h0, so prev(h0) = b. Since hw != b, nxt != h0.
+        // Similarly: next(d) = h1, so prev(h1) = d. Since hw != d, nxt != h1.
+        if nxt == h0 {
+            // next(hw) = h0 and next(b) = h0. From next_prev_inverse:
+            // prev(next(hw)) = hw, so prev(h0) = hw
+            // prev(next(b))  = b,  so prev(h0) = b
+            // Therefore hw = b. But hw ∉ {b}. Contradiction.
+            assert(next_prev_inverse_at(old_m, hw));
+            assert(old_m.half_edges@[h0].prev as int == hw);
+            assert(next_prev_inverse_at(old_m, b));
+            assert(old_m.half_edges@[h0].prev as int == b);
+            assert(false);
+        }
+        if nxt == h1 {
+            // next(hw) = h1 and next(d) = h1. Same argument: hw = d.
+            assert(next_prev_inverse_at(old_m, hw));
+            assert(old_m.half_edges@[h1].prev as int == hw);
+            assert(next_prev_inverse_at(old_m, d));
+            assert(old_m.half_edges@[h1].prev as int == d);
+            assert(false);
+        }
+        // nxt ∉ {h0, h1}, so vertex(nxt) is preserved (a,b,c,d also have vertex preserved)
+        if nxt == a || nxt == b || nxt == c || nxt == d {
+            // vertex preserved for a,b,c,d
+            assert(new_m.half_edges@[nxt].vertex == old_m.half_edges@[nxt].vertex);
+        }
+        assert(new_m.half_edges@[nxt].vertex == old_m.half_edges@[nxt].vertex);
+        assert(adjacent_vertices(new_m, u, v));
+        lemma_trivial_path(new_m, u);
+        lemma_extend_path(new_m, u, u, v);
+    } else if hw == a {
+        // a: vertex preserved, old next = b, new next = h1
+        // Old: u = vertex(a), v = vertex(b) = v_b
+        // New: vertex(a) = u, next(a) = h1, vertex(h1) = v_b = v
+        assert(0 <= a < half_edge_count(new_m));
+        assert(new_m.half_edges@[a].vertex == old_m.half_edges@[a].vertex);
+        assert(new_m.half_edges@[a].next as int == h1);
+        assert(new_m.half_edges@[h1].vertex as int == v_b);
+        assert(old_m.half_edges@[old_m.half_edges@[a].next as int].vertex as int == v);
+        assert(v == v_b);
+        assert(adjacent_vertices(new_m, u, v));
+        lemma_trivial_path(new_m, u);
+        lemma_extend_path(new_m, u, u, v);
+    } else if hw == b {
+        // b: vertex preserved, old next = h0, new next = c
+        // Old: u = vertex(b) = v_b, v = vertex(h0)
+        // New: vertex(b) = v_b, next(b) = c, vertex(c) preserved = vertex(old c)
+        // Need: vertex(old c) = vertex(old h0) = v. From twin_endpoint_correspondence:
+        // vertex(next(h1)) = vertex(twin(h1)) = vertex(h0). next(h1) = c. So vertex(c) = vertex(h0) = v.
+        assert(twin_endpoint_correspondence(old_m));
+        assert(twin_endpoint_correspondence_at(old_m, h1));
+        assert(old_m.half_edges@[c].vertex as int == old_m.half_edges@[h0].vertex as int);
+        assert(v == old_m.half_edges@[h0].vertex as int);
+
+        assert(0 <= b < half_edge_count(new_m));
+        assert(new_m.half_edges@[b].vertex == old_m.half_edges@[b].vertex);
+        assert(new_m.half_edges@[b].next as int == c);
+        assert(new_m.half_edges@[c].vertex == old_m.half_edges@[c].vertex);
+        assert(adjacent_vertices(new_m, u, v));
+        lemma_trivial_path(new_m, u);
+        lemma_extend_path(new_m, u, u, v);
+    } else if hw == c {
+        // c: vertex preserved, old next = d, new next = h0
+        // Old: u = vertex(c), v = vertex(d) = v_d
+        // New: vertex(c) = u, next(c) = h0, vertex(h0) = v_d = v
+        assert(0 <= c < half_edge_count(new_m));
+        assert(new_m.half_edges@[c].vertex == old_m.half_edges@[c].vertex);
+        assert(new_m.half_edges@[c].next as int == h0);
+        assert(new_m.half_edges@[h0].vertex as int == v_d);
+        assert(old_m.half_edges@[old_m.half_edges@[c].next as int].vertex as int == v);
+        assert(v == v_d);
+        assert(adjacent_vertices(new_m, u, v));
+        lemma_trivial_path(new_m, u);
+        lemma_extend_path(new_m, u, u, v);
+    } else if hw == d {
+        // d: vertex preserved, old next = h1, new next = a
+        // Old: u = vertex(d) = v_d, v = vertex(h1)
+        // New: vertex(d) = v_d, next(d) = a, vertex(a) preserved = vertex(old a)
+        // Need: vertex(old a) = vertex(old h1). From twin_endpoint_correspondence at h0:
+        // vertex(next(h0)) = vertex(twin(h0)) = vertex(h1). next(h0) = a. So vertex(a) = vertex(h1).
+        assert(twin_endpoint_correspondence(old_m));
+        assert(twin_endpoint_correspondence_at(old_m, h0));
+        assert(old_m.half_edges@[a].vertex as int == old_m.half_edges@[h1].vertex as int);
+        assert(v == old_m.half_edges@[h1].vertex as int);
+
+        assert(0 <= d < half_edge_count(new_m));
+        assert(new_m.half_edges@[d].vertex == old_m.half_edges@[d].vertex);
+        assert(new_m.half_edges@[d].next as int == a);
+        assert(new_m.half_edges@[a].vertex == old_m.half_edges@[a].vertex);
+        assert(adjacent_vertices(new_m, u, v));
+        lemma_trivial_path(new_m, u);
+        lemma_extend_path(new_m, u, u, v);
+    } else if hw == h0 {
+        // --- h0: old v0→v1 lost, but v0→v_d→v1 exists ---
+        // v0 = vertex(old h0), v1 = vertex(old next(h0)) = vertex(a)
+        // From twin_endpoint_correspondence at h0: vertex(a) = vertex(h1) = v1
+        assert(twin_endpoint_correspondence(old_m));
+        assert(twin_endpoint_correspondence_at(old_m, h0));
+        let v0 = old_m.half_edges@[h0].vertex as int;
+        let v1 = old_m.half_edges@[a].vertex as int;
+        assert(u == v0);
+        assert(v == v1);
+
+        // c witnesses v0→v_d in new_m:
+        // vertex(c) = vertex(old c) = v0 (from twin_endpoint_correspondence at h1)
+        assert(twin_endpoint_correspondence_at(old_m, h1));
+        assert(old_m.half_edges@[c].vertex as int == v0);
+        assert(0 <= c < half_edge_count(new_m));
+        assert(new_m.half_edges@[c].vertex as int == v0);
+        assert(new_m.half_edges@[c].next as int == h0);
+        assert(new_m.half_edges@[h0].vertex as int == v_d);
+        assert(adjacent_vertices(new_m, v0, v_d));
+
+        // d witnesses v_d→v1 in new_m:
+        assert(0 <= d < half_edge_count(new_m));
+        assert(new_m.half_edges@[d].vertex as int == v_d);
+        assert(new_m.half_edges@[d].next as int == a);
+        assert(new_m.half_edges@[a].vertex as int == v1);
+        assert(adjacent_vertices(new_m, v_d, v1));
+
+        // Path: v0 → v_d → v1
+        assert(0 <= v0 < vertex_count(new_m));
+        assert(0 <= v_d < vertex_count(new_m));
+        assert(0 <= v1 < vertex_count(new_m));
+        lemma_trivial_path(new_m, v0);
+        lemma_extend_path(new_m, v0, v0, v_d);
+        lemma_extend_path(new_m, v0, v_d, v1);
+    } else {
+        // --- h1: old v1→v0 lost, but v1→v_b→v0 exists ---
+        assert(hw == h1);
+        assert(twin_endpoint_correspondence(old_m));
+        assert(twin_endpoint_correspondence_at(old_m, h1));
+        let v1 = old_m.half_edges@[h1].vertex as int;
+        let v0 = old_m.half_edges@[c].vertex as int;
+        assert(u == v1);
+        assert(v == v0);
+
+        // From twin_endpoint_correspondence at h0: vertex(a) = vertex(h1) = v1
+        assert(twin_endpoint_correspondence_at(old_m, h0));
+        assert(old_m.half_edges@[a].vertex as int == v1);
+
+        // a witnesses v1→v_b in new_m:
+        assert(0 <= a < half_edge_count(new_m));
+        assert(new_m.half_edges@[a].vertex as int == v1);
+        assert(new_m.half_edges@[a].next as int == h1);
+        assert(new_m.half_edges@[h1].vertex as int == v_b);
+        assert(adjacent_vertices(new_m, v1, v_b));
+
+        // b witnesses v_b→v0 in new_m:
+        assert(0 <= b < half_edge_count(new_m));
+        assert(new_m.half_edges@[b].vertex as int == v_b);
+        assert(new_m.half_edges@[b].next as int == c);
+        assert(new_m.half_edges@[c].vertex as int == v0);
+        assert(adjacent_vertices(new_m, v_b, v0));
+
+        // Path: v1 → v_b → v0
+        assert(0 <= v1 < vertex_count(new_m));
+        assert(0 <= v_b < vertex_count(new_m));
+        assert(0 <= v0 < vertex_count(new_m));
+        lemma_trivial_path(new_m, v1);
+        lemma_extend_path(new_m, v1, v1, v_b);
+        lemma_extend_path(new_m, v1, v_b, v0);
+    }
+}
+
+// =============================================================================
+// 9. flip_edge path transfer
+// =============================================================================
+
+/// If path is a valid path in old_m, then its endpoints are reachable in new_m.
+proof fn lemma_flip_edge_path_reachable(
+    old_m: &Mesh, new_m: &Mesh, e: int, path: Seq<int>,
+)
+    requires
+        structurally_valid(old_m),
+        flip_edge_post(old_m, new_m, e),
+        0 <= e < edge_count(old_m),
+        fe_all_distinct(old_m, e),
+        old_m.half_edges@[fe_b(old_m, e)].next as int == fe_h0(old_m, e),
+        old_m.half_edges@[fe_d(old_m, e)].next as int == fe_h1(old_m, e),
+        vertex_path(old_m, path),
+    ensures
+        vertices_reachable(new_m, path[0], path[path.len() - 1]),
+    decreases path.len(),
+{
+    if path.len() <= 1 {
+        assert(0 <= path[0] < vertex_count(new_m));
+        lemma_trivial_path(new_m, path[0]);
+    } else {
+        let n = path.len();
+        let prefix = path.subrange(0, n - 1);
+
+        assert(prefix.len() >= 1);
+        assert forall|i: int| 0 <= i < prefix.len()
+        implies 0 <= #[trigger] prefix[i] < vertex_count(old_m)
+        by { assert(prefix[i] == path[i]); }
+
+        assert forall|i: int| 0 <= i < prefix.len() - 1
+        implies adjacent_vertices(old_m, #[trigger] prefix[i], prefix[i + 1])
+        by {
+            assert(prefix[i] == path[i]);
+            assert(prefix[i + 1] == path[i + 1]);
+        }
+
+        lemma_flip_edge_path_reachable(old_m, new_m, e, prefix);
+
+        assert(adjacent_vertices(old_m, path[n - 2], path[n - 1]));
+        lemma_flip_edge_adj_reachable(old_m, new_m, e, path[n - 2], path[n - 1]);
+
+        lemma_reachable_transitive(new_m, path[0], path[n - 2], path[n - 1]);
+    }
+}
+
+// =============================================================================
+// 10. Master lemma: flip_edge preserves connectivity
+// =============================================================================
+
+/// If old_m is structurally valid, connected, and new_m is the result of
+/// flip_edge (satisfying flip_edge_post), then new_m is connected.
+pub proof fn lemma_flip_edge_preserves_connected(
+    old_m: &Mesh, new_m: &Mesh, e: int,
+)
+    requires
+        structurally_valid(old_m),
+        is_connected(old_m),
+        flip_edge_post(old_m, new_m, e),
+        0 <= e < edge_count(old_m),
+        fe_all_distinct(old_m, e),
+        old_m.half_edges@[fe_b(old_m, e)].next as int == fe_h0(old_m, e),
+        old_m.half_edges@[fe_d(old_m, e)].next as int == fe_h1(old_m, e),
+        vertex_count(old_m) > 0,
+    ensures
+        is_connected(new_m),
+{
+    assert forall|u: int, v: int|
+        0 <= u < vertex_count(new_m) && 0 <= v < vertex_count(new_m)
+    implies vertices_reachable(new_m, u, v)
+    by {
+        // vertex count unchanged, so u and v are old vertices
+        assert(vertices_reachable(old_m, u, v));
+        let path = choose|p: Seq<int>| vertex_path(old_m, p) && p[0] == u && p[p.len() - 1] == v;
+        lemma_flip_edge_path_reachable(old_m, new_m, e, path);
     }
 }
 

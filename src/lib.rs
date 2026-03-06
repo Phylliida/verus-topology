@@ -41,4 +41,7 @@ pub mod geometric_checkers;
 pub mod connectivity_proofs;
 
 #[cfg(verus_keep_ghost)]
+pub mod euler_validity;
+
+#[cfg(verus_keep_ghost)]
 pub mod point_in_solid;
