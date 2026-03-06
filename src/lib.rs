@@ -45,3 +45,6 @@ pub mod euler_validity;
 
 #[cfg(verus_keep_ghost)]
 pub mod point_in_solid;
+
+#[cfg(verus_keep_ghost)]
+pub mod delaunay;

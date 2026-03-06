@@ -220,7 +220,7 @@ pub fn check_consistently_oriented_3d(
 // =============================================================================
 
 /// Bridge: incircle2d_sign_exec result != Positive implies edge_delaunay_2d.
-proof fn lemma_incircle_not_positive_implies_edge_delaunay(
+pub proof fn lemma_incircle_not_positive_implies_edge_delaunay(
     m: &Mesh, pos: &Vec<RuntimePoint2>,
     e: int,
     va: int, vb: int, vc: int, vd: int,
@@ -252,6 +252,47 @@ proof fn lemma_incircle_not_positive_implies_edge_delaunay(
     assert(pv[vb] == pos@[vb]@);
     assert(pv[vc] == pos@[vc]@);
     assert(pv[vd] == pos@[vd]@);
+}
+
+/// Bridge: incircle2d_sign_exec result == Positive implies NOT edge_delaunay_2d.
+/// Converse of lemma_incircle_not_positive_implies_edge_delaunay.
+pub proof fn lemma_incircle_positive_implies_not_edge_delaunay(
+    m: &Mesh, pos: &Vec<RuntimePoint2>,
+    e: int,
+    va: int, vb: int, vc: int, vd: int,
+)
+    requires
+        index_bounds(m),
+        0 <= e < edge_count(m),
+        pos@.len() == vertex_count(m),
+        0 <= va < vertex_count(m),
+        0 <= vb < vertex_count(m),
+        0 <= vc < vertex_count(m),
+        0 <= vd < vertex_count(m),
+        // The 4 vertices match the edge diamond
+        m.half_edges@[m.edge_half_edges@[e] as int].vertex as int == va,
+        m.half_edges@[m.half_edges@[m.edge_half_edges@[e] as int].next as int].vertex as int == vb,
+        m.half_edges@[m.half_edges@[m.half_edges@[m.edge_half_edges@[e] as int].next as int].next as int].vertex as int == vc,
+        ({
+            let t = m.half_edges@[m.edge_half_edges@[e] as int].twin as int;
+            m.half_edges@[m.half_edges@[m.half_edges@[t].next as int].next as int].vertex as int == vd
+        }),
+        // Sign IS Positive
+        incircle2d_sign::<RationalModel>(pos@[va]@, pos@[vb]@, pos@[vc]@, pos@[vd]@)
+            == OrientationSign::Positive,
+    ensures
+        !edge_delaunay_2d::<RationalModel>(m, pos_view_2d(pos), e),
+{
+    let pv = pos_view_2d(pos);
+    assert(pv[va] == pos@[va]@);
+    assert(pv[vb] == pos@[vb]@);
+    assert(pv[vc] == pos@[vc]@);
+    assert(pv[vd] == pos@[vd]@);
+    // incircle2d_sign == Positive <==> incircle2d_positive (by lemma_incircle2d_sign_matches)
+    lemma_incircle2d_sign_matches::<RationalModel>(pos@[va]@, pos@[vb]@, pos@[vc]@, pos@[vd]@);
+    // So incircle2d_positive(a,b,c,d) == true
+    // edge_delaunay_2d unfolds to is_locally_delaunay_edge_2d(a,b,c,d) == !incircle2d_positive(a,b,c,d)
+    // Which is false. QED.
 }
 
 // =============================================================================
@@ -323,7 +364,6 @@ pub fn check_locally_delaunay_mesh_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (ou
 
 /// Bridge: orient3d_sign_exec result != Positive for one point.
 proof fn lemma_orient3d_not_positive_for_point(
-    pos: &Vec<RuntimePoint3>,
     points: &Vec<RuntimePoint3>,
     a: Point3<RationalModel>,
     b: Point3<RationalModel>,
@@ -386,7 +426,7 @@ pub fn check_convex_hull_face_3d(
             _ => {
                 proof {
                     lemma_orient3d_not_positive_for_point(
-                        &Vec::empty(), points, a@, b@, c@, i as int,
+                        points, a@, b@, c@, i as int,
                     );
                 }
             }
@@ -436,7 +476,8 @@ pub fn check_convex_hull_mesh_3d(
             0 <= f <= fcnt,
             fcnt == face_count(m),
             forall|i: int| 0 <= i < points@.len() ==> (#[trigger] points@[i]).wf_spec(),
-            forall|ff: int| 0 <= ff < f as int ==> {
+            forall|ff: int| #![trigger m.face_half_edges@[ff]]
+                0 <= ff < f as int ==> {
                 let start = m.face_half_edges@[ff] as int;
                 let h0 = start;
                 let h1 = m.half_edges@[h0].next as int;
