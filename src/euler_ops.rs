@@ -23,23 +23,23 @@ pub enum EulerError {
 // Helper: rebuild a HalfEdge with one field changed
 // =============================================================================
 
-spec fn he_with_twin(he: HalfEdge, new_twin: usize) -> HalfEdge {
+pub open spec fn he_with_twin(he: HalfEdge, new_twin: usize) -> HalfEdge {
     HalfEdge { twin: new_twin, next: he.next, prev: he.prev, vertex: he.vertex, edge: he.edge, face: he.face }
 }
 
-spec fn he_with_next(he: HalfEdge, new_next: usize) -> HalfEdge {
+pub open spec fn he_with_next(he: HalfEdge, new_next: usize) -> HalfEdge {
     HalfEdge { twin: he.twin, next: new_next, prev: he.prev, vertex: he.vertex, edge: he.edge, face: he.face }
 }
 
-spec fn he_with_prev(he: HalfEdge, new_prev: usize) -> HalfEdge {
+pub open spec fn he_with_prev(he: HalfEdge, new_prev: usize) -> HalfEdge {
     HalfEdge { twin: he.twin, next: he.next, prev: new_prev, vertex: he.vertex, edge: he.edge, face: he.face }
 }
 
-spec fn he_with_vertex(he: HalfEdge, new_vertex: usize) -> HalfEdge {
+pub open spec fn he_with_vertex(he: HalfEdge, new_vertex: usize) -> HalfEdge {
     HalfEdge { twin: he.twin, next: he.next, prev: he.prev, vertex: new_vertex, edge: he.edge, face: he.face }
 }
 
-spec fn he_with_edge(he: HalfEdge, new_edge: usize) -> HalfEdge {
+pub open spec fn he_with_edge(he: HalfEdge, new_edge: usize) -> HalfEdge {
     HalfEdge { twin: he.twin, next: he.next, prev: he.prev, vertex: he.vertex, edge: new_edge, face: he.face }
 }
 
@@ -514,6 +514,108 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
 // 5.3 flip_edge
 // =============================================================================
 
+// Spec helpers for flip_edge half-edge indices
+pub open spec fn fe_h0(m: &Mesh, e: int) -> int {
+    m.edge_half_edges@[e] as int
+}
+pub open spec fn fe_h1(m: &Mesh, e: int) -> int {
+    m.half_edges@[fe_h0(m, e)].twin as int
+}
+pub open spec fn fe_a(m: &Mesh, e: int) -> int {
+    m.half_edges@[fe_h0(m, e)].next as int
+}
+pub open spec fn fe_b(m: &Mesh, e: int) -> int {
+    m.half_edges@[fe_a(m, e)].next as int
+}
+pub open spec fn fe_c(m: &Mesh, e: int) -> int {
+    m.half_edges@[fe_h1(m, e)].next as int
+}
+pub open spec fn fe_d(m: &Mesh, e: int) -> int {
+    m.half_edges@[fe_c(m, e)].next as int
+}
+
+/// All six flip_edge half-edges are distinct.
+pub open spec fn fe_all_distinct(m: &Mesh, e: int) -> bool {
+    let h0 = fe_h0(m, e);
+    let h1 = fe_h1(m, e);
+    let a = fe_a(m, e);
+    let b = fe_b(m, e);
+    let c = fe_c(m, e);
+    let d = fe_d(m, e);
+    h0 != h1 && h0 != a && h0 != b && h0 != c && h0 != d
+    && h1 != a && h1 != b && h1 != c && h1 != d
+    && a != b && a != c && a != d
+    && b != c && b != d
+    && c != d
+}
+
+/// Structural postcondition of flip_edge_build.
+pub open spec fn flip_edge_post(old_m: &Mesh, new_m: &Mesh, e: int) -> bool {
+    let h0 = fe_h0(old_m, e);
+    let h1 = fe_h1(old_m, e);
+    let a = fe_a(old_m, e);
+    let b = fe_b(old_m, e);
+    let c = fe_c(old_m, e);
+    let d = fe_d(old_m, e);
+    let hcnt = half_edge_count(old_m);
+    let v_b = old_m.half_edges@[b].vertex as int;
+    let v_d = old_m.half_edges@[d].vertex as int;
+    let f0 = old_m.half_edges@[h0].face as int;
+    let f1 = old_m.half_edges@[h1].face as int;
+    let edge_idx = old_m.half_edges@[h0].edge as int;
+    // Counts unchanged
+    &&& vertex_count(new_m) == vertex_count(old_m)
+    &&& edge_count(new_m) == edge_count(old_m)
+    &&& face_count(new_m) == face_count(old_m)
+    &&& half_edge_count(new_m) == hcnt
+    // Frame: unmodified half-edges (ALL fields)
+    &&& forall|h: int| 0 <= h < hcnt
+        && h != h0 && h != h1 && h != a && h != b && h != c && h != d
+        ==> new_m.half_edges@[h] == old_m.half_edges@[h]
+    // h0: fully specified
+    &&& new_m.half_edges@[h0].twin as int == h1
+    &&& new_m.half_edges@[h0].next as int == b
+    &&& new_m.half_edges@[h0].prev as int == c
+    &&& new_m.half_edges@[h0].vertex as int == v_d
+    &&& new_m.half_edges@[h0].edge as int == edge_idx
+    &&& new_m.half_edges@[h0].face as int == f0
+    // h1: fully specified
+    &&& new_m.half_edges@[h1].twin as int == h0
+    &&& new_m.half_edges@[h1].next as int == d
+    &&& new_m.half_edges@[h1].prev as int == a
+    &&& new_m.half_edges@[h1].vertex as int == v_b
+    &&& new_m.half_edges@[h1].edge as int == edge_idx
+    &&& new_m.half_edges@[h1].face as int == f1
+    // a: twin/vertex/edge preserved; next/prev/face changed
+    &&& new_m.half_edges@[a].twin == old_m.half_edges@[a].twin
+    &&& new_m.half_edges@[a].next as int == h1
+    &&& new_m.half_edges@[a].prev as int == d
+    &&& new_m.half_edges@[a].vertex == old_m.half_edges@[a].vertex
+    &&& new_m.half_edges@[a].edge == old_m.half_edges@[a].edge
+    &&& new_m.half_edges@[a].face as int == f1
+    // b: twin/vertex/edge/face preserved; next/prev changed
+    &&& new_m.half_edges@[b].twin == old_m.half_edges@[b].twin
+    &&& new_m.half_edges@[b].next as int == c
+    &&& new_m.half_edges@[b].prev as int == h0
+    &&& new_m.half_edges@[b].vertex == old_m.half_edges@[b].vertex
+    &&& new_m.half_edges@[b].edge == old_m.half_edges@[b].edge
+    &&& new_m.half_edges@[b].face == old_m.half_edges@[b].face
+    // c: twin/vertex/edge preserved; next/prev/face changed
+    &&& new_m.half_edges@[c].twin == old_m.half_edges@[c].twin
+    &&& new_m.half_edges@[c].next as int == h0
+    &&& new_m.half_edges@[c].prev as int == b
+    &&& new_m.half_edges@[c].vertex == old_m.half_edges@[c].vertex
+    &&& new_m.half_edges@[c].edge == old_m.half_edges@[c].edge
+    &&& new_m.half_edges@[c].face as int == f0
+    // d: twin/vertex/edge/face preserved; next/prev changed
+    &&& new_m.half_edges@[d].twin == old_m.half_edges@[d].twin
+    &&& new_m.half_edges@[d].next as int == a
+    &&& new_m.half_edges@[d].prev as int == h1
+    &&& new_m.half_edges@[d].vertex == old_m.half_edges@[d].vertex
+    &&& new_m.half_edges@[d].edge == old_m.half_edges@[d].edge
+    &&& new_m.half_edges@[d].face == old_m.half_edges@[d].face
+}
+
 /// Rotate edge 90° within quad formed by two adjacent triangles. 0V, 0E, 0F.
 ///
 /// Before:           After:
@@ -526,14 +628,20 @@ pub fn split_face(mesh: Mesh, h_start: usize, h_end: usize) -> (result: Result<M
 ///     a                 a
 ///
 /// Helper: perform the flip_edge mutation and return the new mesh.
-fn flip_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
+pub fn flip_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
     requires
         index_bounds(&mesh),
         0 <= e < edge_count(&mesh) as int,
+        // Triangle conditions
+        mesh.half_edges@[fe_b(&mesh, e as int)].next as int == fe_h0(&mesh, e as int),
+        mesh.half_edges@[fe_d(&mesh, e as int)].next as int == fe_h1(&mesh, e as int),
+        // All six half-edges distinct
+        fe_all_distinct(&mesh, e as int),
     ensures
         vertex_count(&result_mesh) == vertex_count(&mesh),
         edge_count(&result_mesh) == edge_count(&mesh),
         face_count(&result_mesh) == face_count(&mesh),
+        flip_edge_post(&mesh, &result_mesh, e as int),
 {
     let h0 = mesh.edge_half_edges[e];
     let h1 = mesh.half_edges[h0].twin;
@@ -549,6 +657,9 @@ fn flip_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
     let v_b = mesh.half_edges[b].vertex;
     let v_d = mesh.half_edges[d].vertex;
     let edge_idx = mesh.half_edges[h0].edge;
+
+    let ghost old_hes = mesh.half_edges@;
+    let hcnt = mesh.half_edges.len();
 
     let mut half_edges = mesh.half_edges;
 
@@ -568,6 +679,63 @@ fn flip_edge_build(mesh: Mesh, e: usize) -> (result_mesh: Mesh)
     set_he_prev(&mut half_edges, a, d);
     set_he_next(&mut half_edges, a, h1);
     set_he_face(&mut half_edges, a, f1);
+
+    proof {
+        // Frame: unmodified half-edges (ALL fields)
+        assert forall|h: int| 0 <= h < hcnt as int
+            && h != h0 as int && h != h1 as int && h != a as int
+            && h != b as int && h != c as int && h != d as int
+        implies half_edges@[h] == old_hes[h]
+        by {}
+
+        // h0: fully replaced in step 1, untouched after
+        assert(half_edges@[h0 as int].twin == h1);
+        assert(half_edges@[h0 as int].next == b);
+        assert(half_edges@[h0 as int].prev == c);
+        assert(half_edges@[h0 as int].vertex == v_d);
+        assert(half_edges@[h0 as int].edge == edge_idx);
+        assert(half_edges@[h0 as int].face == f0);
+
+        // h1: fully replaced in step 2, untouched after
+        assert(half_edges@[h1 as int].twin == h0);
+        assert(half_edges@[h1 as int].next == d);
+        assert(half_edges@[h1 as int].prev == a);
+        assert(half_edges@[h1 as int].vertex == v_b);
+        assert(half_edges@[h1 as int].edge == edge_idx);
+        assert(half_edges@[h1 as int].face == f1);
+
+        // b: twin/vertex/edge/face preserved; prev=h0, next=c
+        assert(half_edges@[b as int].twin == old_hes[b as int].twin);
+        assert(half_edges@[b as int].next == c);
+        assert(half_edges@[b as int].prev == h0);
+        assert(half_edges@[b as int].vertex == old_hes[b as int].vertex);
+        assert(half_edges@[b as int].edge == old_hes[b as int].edge);
+        assert(half_edges@[b as int].face == old_hes[b as int].face);
+
+        // c: twin/vertex/edge preserved; prev=b, next=h0, face=f0
+        assert(half_edges@[c as int].twin == old_hes[c as int].twin);
+        assert(half_edges@[c as int].next == h0);
+        assert(half_edges@[c as int].prev == b);
+        assert(half_edges@[c as int].vertex == old_hes[c as int].vertex);
+        assert(half_edges@[c as int].edge == old_hes[c as int].edge);
+        assert(half_edges@[c as int].face == f0);
+
+        // d: twin/vertex/edge/face preserved; prev=h1, next=a
+        assert(half_edges@[d as int].twin == old_hes[d as int].twin);
+        assert(half_edges@[d as int].next == a);
+        assert(half_edges@[d as int].prev == h1);
+        assert(half_edges@[d as int].vertex == old_hes[d as int].vertex);
+        assert(half_edges@[d as int].edge == old_hes[d as int].edge);
+        assert(half_edges@[d as int].face == old_hes[d as int].face);
+
+        // a: twin/vertex/edge preserved; prev=d, next=h1, face=f1
+        assert(half_edges@[a as int].twin == old_hes[a as int].twin);
+        assert(half_edges@[a as int].next == h1);
+        assert(half_edges@[a as int].prev == d);
+        assert(half_edges@[a as int].vertex == old_hes[a as int].vertex);
+        assert(half_edges@[a as int].edge == old_hes[a as int].edge);
+        assert(half_edges@[a as int].face == f1);
+    }
 
     let mut face_half_edges = mesh.face_half_edges;
     face_half_edges.set(f0, h0);
@@ -592,9 +760,7 @@ pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
         0 <= e < edge_count(&mesh) as int,
     ensures
         result is Ok ==> structurally_valid(&result->Ok_0),
-        result is Ok ==> vertex_count(&result->Ok_0) == vertex_count(&mesh),
-        result is Ok ==> edge_count(&result->Ok_0) == edge_count(&mesh),
-        result is Ok ==> face_count(&result->Ok_0) == face_count(&mesh),
+        result is Ok ==> flip_edge_post(&mesh, &result->Ok_0, e as int),
 {
     let h0 = mesh.edge_half_edges[e];
     let h1 = mesh.half_edges[h0].twin;
@@ -610,6 +776,16 @@ pub fn flip_edge(mesh: Mesh, e: usize) -> (result: Result<Mesh, EulerError>)
     }
     if mesh.half_edges[d].next != h1 {
         return Err(EulerError::NotTriangleFace { face: f1 });
+    }
+
+    // Check all six half-edges are distinct
+    if h0 == h1 || h0 == a || h0 == b || h0 == c || h0 == d
+        || h1 == a || h1 == b || h1 == c || h1 == d
+        || a == b || a == c || a == d
+        || b == c || b == d
+        || c == d
+    {
+        return Err(EulerError::WouldCreateDegeneracy);
     }
 
     let result_mesh = flip_edge_build(mesh, e);

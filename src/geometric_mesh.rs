@@ -7,6 +7,10 @@ use verus_geometry::point3::Point3;
 use verus_geometry::orient2d::*;
 use verus_geometry::orientation_sign::*;
 use verus_geometry::orient3d::*;
+use verus_geometry::incircle::*;
+use verus_geometry::insphere::*;
+use verus_geometry::delaunay::*;
+use verus_geometry::convex_hull_3d::*;
 use crate::mesh::*;
 use crate::invariants::*;
 use crate::iteration::*;
@@ -277,6 +281,81 @@ pub open spec fn consistently_oriented_3d<T: OrderedRing>(
     forall|f: int|
         0 <= f < face_count(m)
             ==> face_outward_normal_3d(m, pos, f, interior)
+}
+
+// =============================================================================
+// 7.6 Edge diamond and Delaunay predicates
+// =============================================================================
+
+/// Extract the 4 vertices of the "diamond" around edge e in 2D:
+/// (from(h), to(h), opposite_left, opposite_right)
+/// where h = edge_half_edges[e], opposite_left = next(next(h)).vertex,
+/// and opposite_right = next(next(twin(h))).vertex.
+pub open spec fn edge_diamond_2d<T: Ring>(
+    m: &Mesh,
+    pos: Seq<Point2<T>>,
+    e: int,
+) -> (Point2<T>, Point2<T>, Point2<T>, Point2<T>)
+    recommends
+        index_bounds(m),
+        0 <= e < edge_count(m),
+        pos.len() == vertex_count(m),
+{
+    let h = m.edge_half_edges@[e] as int;
+    let t = m.half_edges@[h].twin as int;
+    let a = pos[m.half_edges@[h].vertex as int];                            // from(h)
+    let b = pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]; // to(h)
+    let c = pos[m.half_edges@[m.half_edges@[m.half_edges@[h].next as int].next as int].vertex as int]; // opposite_left
+    let d = pos[m.half_edges@[m.half_edges@[m.half_edges@[t].next as int].next as int].vertex as int]; // opposite_right
+    (a, b, c, d)
+}
+
+/// Edge e is locally Delaunay in 2D: d is NOT inside the circumcircle of (a, b, c)
+/// where (a, b, c, d) is the edge diamond.
+pub open spec fn edge_delaunay_2d<T: OrderedRing>(
+    m: &Mesh,
+    pos: Seq<Point2<T>>,
+    e: int,
+) -> bool
+    recommends
+        index_bounds(m),
+        0 <= e < edge_count(m),
+        pos.len() == vertex_count(m),
+{
+    let (a, b, c, d) = edge_diamond_2d(m, pos, e);
+    is_locally_delaunay_edge_2d(a, b, c, d)
+}
+
+/// All edges in the mesh are locally Delaunay in 2D.
+pub open spec fn is_locally_delaunay_mesh_2d<T: OrderedRing>(
+    m: &Mesh,
+    pos: Seq<Point2<T>>,
+) -> bool
+    recommends
+        geometric_embedding_2d(m, pos),
+{
+    forall|e: int| 0 <= e < edge_count(m) ==> edge_delaunay_2d(m, pos, e)
+}
+
+/// The mesh forms a convex hull of the given 3D point set: closed + all faces are hull faces.
+pub open spec fn is_convex_hull_mesh_3d<T: OrderedRing>(
+    m: &Mesh,
+    pos: Seq<Point3<T>>,
+    points: Seq<Point3<T>>,
+) -> bool
+    recommends
+        geometric_embedding_3d(m, pos),
+{
+    forall|f: int| 0 <= f < face_count(m) ==> {
+        let start = m.face_half_edges@[f] as int;
+        let h0 = start;
+        let h1 = m.half_edges@[h0].next as int;
+        let h2 = m.half_edges@[h1].next as int;
+        let a = pos[m.half_edges@[h0].vertex as int];
+        let b = pos[m.half_edges@[h1].vertex as int];
+        let c = pos[m.half_edges@[h2].vertex as int];
+        all_points_on_or_below_plane(points, a, b, c)
+    }
 }
 
 } // verus!
