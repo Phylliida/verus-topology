@@ -126,7 +126,7 @@ pub open spec fn reverse_seq(s: Seq<int>) -> Seq<int> {
 }
 
 /// Reversing a valid path gives a valid path (adjacency is symmetric).
-proof fn lemma_reverse_path(m: &Mesh, path: Seq<int>)
+pub proof fn lemma_reverse_path(m: &Mesh, path: Seq<int>)
     requires
         index_bounds(m),
         twin_endpoint_correspondence(m),
@@ -167,7 +167,7 @@ pub open spec fn concat_paths(p1: Seq<int>, p2: Seq<int>) -> Seq<int>
 }
 
 /// Helper: vertices in concat_paths are all in bounds.
-proof fn lemma_concat_bounds(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
+pub proof fn lemma_concat_bounds(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
         p1.len() >= 1, p2.len() >= 1,
@@ -186,7 +186,7 @@ proof fn lemma_concat_bounds(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
 }
 
 /// Helper: consecutive pairs in concat_paths are adjacent.
-proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
+pub proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
         p1.len() >= 1, p2.len() >= 1,
@@ -218,7 +218,7 @@ proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
 }
 
 /// Concatenating two paths sharing an endpoint gives a valid path.
-proof fn lemma_concat_paths(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
+pub proof fn lemma_concat_paths(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
         p1.len() >= 1, p2.len() >= 1,
@@ -231,6 +231,19 @@ proof fn lemma_concat_paths(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
 {
     lemma_concat_bounds(m, p1, p2);
     lemma_concat_adjacency(m, p1, p2);
+}
+
+/// Transitivity: reachable(u, v) and reachable(v, w) implies reachable(u, w).
+pub proof fn lemma_reachable_transitive(m: &Mesh, u: int, v: int, w: int)
+    requires
+        vertices_reachable(m, u, v),
+        vertices_reachable(m, v, w),
+    ensures
+        vertices_reachable(m, u, w),
+{
+    let p1 = choose|p: Seq<int>| vertex_path(m, p) && p[0] == u && p[p.len() - 1] == v;
+    let p2 = choose|p: Seq<int>| vertex_path(m, p) && p[0] == v && p[p.len() - 1] == w;
+    lemma_concat_paths(m, p1, p2);
 }
 
 // =============================================================================

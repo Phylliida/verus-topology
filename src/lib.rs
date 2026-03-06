@@ -36,3 +36,9 @@ pub mod checker_proofs;
 
 #[cfg(verus_keep_ghost)]
 pub mod geometric_checkers;
+
+#[cfg(verus_keep_ghost)]
+pub mod connectivity_proofs;
+
+#[cfg(verus_keep_ghost)]
+pub mod point_in_solid;
