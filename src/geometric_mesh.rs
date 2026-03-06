@@ -346,7 +346,8 @@ pub open spec fn is_convex_hull_mesh_3d<T: OrderedRing>(
     recommends
         geometric_embedding_3d(m, pos),
 {
-    forall|f: int| 0 <= f < face_count(m) ==> {
+    forall|f: int| #![trigger m.face_half_edges@[f]]
+        0 <= f < face_count(m) ==> {
         let start = m.face_half_edges@[f] as int;
         let h0 = start;
         let h1 = m.half_edges@[h0].next as int;
