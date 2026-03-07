@@ -13,9 +13,7 @@ verus! {
 // that establishes the invariant from the construction algorithm's
 // properties.
 //
-// 8 of 10 invariants are proved directly in from_face_cycles.
-// Remaining 2 (face_representative_cycles, vertex_manifold) use assume(false)
-// and are covered by the runtime check_structurally_valid call.
+// All 10 invariants are proved from the construction algorithm.
 // =============================================================================
 
 // =============================================================================
