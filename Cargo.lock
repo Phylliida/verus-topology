@@ -92,12 +92,23 @@ dependencies = [
  "verus-algebra",
  "verus-bigint",
  "verus-linalg",
+ "verus-quadratic-extension",
  "verus-rational",
  "vstd",
 ]
 
 [[package]]
 name = "verus-linalg"
+version = "0.1.0"
+dependencies = [
+ "verus-algebra",
+ "verus-bigint",
+ "verus-rational",
+ "vstd",
+]
+
+[[package]]
+name = "verus-quadratic-extension"
 version = "0.1.0"
 dependencies = [
  "verus-algebra",
