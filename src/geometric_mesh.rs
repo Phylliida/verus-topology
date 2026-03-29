@@ -17,11 +17,11 @@ use crate::iteration::*;
 
 verus! {
 
-// =============================================================================
-// 7.1 Geometric embedding specs
-// =============================================================================
+//  =============================================================================
+//  7.1 Geometric embedding specs
+//  =============================================================================
 
-/// A 2D geometric embedding: positions for each vertex + valid mesh.
+///  A 2D geometric embedding: positions for each vertex + valid mesh.
 pub open spec fn geometric_embedding_2d<T: OrderedRing>(
     m: &Mesh,
     positions: Seq<Point2<T>>,
@@ -29,7 +29,7 @@ pub open spec fn geometric_embedding_2d<T: OrderedRing>(
     positions.len() == vertex_count(m) && structurally_valid(m)
 }
 
-/// A 3D geometric embedding: positions for each vertex + valid mesh.
+///  A 3D geometric embedding: positions for each vertex + valid mesh.
 pub open spec fn geometric_embedding_3d<T: OrderedRing>(
     m: &Mesh,
     positions: Seq<Point3<T>>,
@@ -37,11 +37,11 @@ pub open spec fn geometric_embedding_3d<T: OrderedRing>(
     positions.len() == vertex_count(m) && structurally_valid(m)
 }
 
-// =============================================================================
-// 7.2 Half-edge position accessors
-// =============================================================================
+//  =============================================================================
+//  7.2 Half-edge position accessors
+//  =============================================================================
 
-/// Position of the origin vertex of half-edge h (2D).
+///  Position of the origin vertex of half-edge h (2D).
 pub open spec fn he_from_pos_2d<T: Ring>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -55,8 +55,8 @@ pub open spec fn he_from_pos_2d<T: Ring>(
     pos[m.half_edges@[h].vertex as int]
 }
 
-/// Position of the destination vertex of half-edge h (2D).
-/// Destination = origin of next(h).
+///  Position of the destination vertex of half-edge h (2D).
+///  Destination = origin of next(h).
 pub open spec fn he_to_pos_2d<T: Ring>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -70,7 +70,7 @@ pub open spec fn he_to_pos_2d<T: Ring>(
     pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]
 }
 
-/// Position of the origin vertex of half-edge h (3D).
+///  Position of the origin vertex of half-edge h (3D).
 pub open spec fn he_from_pos_3d<T: Ring>(
     m: &Mesh,
     pos: Seq<Point3<T>>,
@@ -84,7 +84,7 @@ pub open spec fn he_from_pos_3d<T: Ring>(
     pos[m.half_edges@[h].vertex as int]
 }
 
-/// Position of the destination vertex of half-edge h (3D).
+///  Position of the destination vertex of half-edge h (3D).
 pub open spec fn he_to_pos_3d<T: Ring>(
     m: &Mesh,
     pos: Seq<Point3<T>>,
@@ -98,12 +98,12 @@ pub open spec fn he_to_pos_3d<T: Ring>(
     pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]
 }
 
-// =============================================================================
-// 7.3 Consistent orientation predicate (2D)
-// =============================================================================
+//  =============================================================================
+//  7.3 Consistent orientation predicate (2D)
+//  =============================================================================
 
-/// Face f has counter-clockwise orientation in 2D.
-/// Uses orient2d on the first three vertices of the face cycle.
+///  Face f has counter-clockwise orientation in 2D.
+///  Uses orient2d on the first three vertices of the face cycle.
 pub open spec fn face_oriented_ccw_2d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -124,7 +124,7 @@ pub open spec fn face_oriented_ccw_2d<T: OrderedRing>(
     orient2d_sign(a, b, c) == OrientationSign::Positive
 }
 
-/// All faces are oriented counter-clockwise in 2D.
+///  All faces are oriented counter-clockwise in 2D.
 pub open spec fn consistently_oriented_2d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -137,19 +137,19 @@ pub open spec fn consistently_oriented_2d<T: OrderedRing>(
             ==> face_oriented_ccw_2d(m, pos, f)
 }
 
-// =============================================================================
-// 7.4 Twin reverses orientation lemma
-// =============================================================================
+//  =============================================================================
+//  7.4 Twin reverses orientation lemma
+//  =============================================================================
 
-/// Twin traversal swaps edge direction, so orient2d sign flips.
+///  Twin traversal swaps edge direction, so orient2d sign flips.
 ///
-/// For half-edge h with twin t = twin(h):
-///   from(h) = to(t) and to(h) = from(t)
-///   So for any third point c, orient2d(from(h), to(h), c) and
-///   orient2d(from(t), to(t), c) have opposite signs.
+///  For half-edge h with twin t = twin(h):
+///    from(h) = to(t) and to(h) = from(t)
+///    So for any third point c, orient2d(from(h), to(h), c) and
+///    orient2d(from(t), to(t), c) have opposite signs.
 ///
-/// This connects to lemma_orient2d_swap_bc from verus-geometry:
-///   orient2d(a, c, b) ≡ -orient2d(a, b, c)
+///  This connects to lemma_orient2d_swap_bc from verus-geometry:
+///    orient2d(a, c, b) ≡ -orient2d(a, b, c)
 pub proof fn lemma_twin_reverses_edge_direction<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -159,7 +159,7 @@ pub proof fn lemma_twin_reverses_edge_direction<T: OrderedRing>(
         geometric_embedding_2d(m, pos),
         0 <= h < half_edge_count(m),
     ensures
-        // Twin swaps from/to vertices
+        //  Twin swaps from/to vertices
         he_from_pos_2d(m, pos, m.half_edges@[h].twin as int)
             == he_to_pos_2d(m, pos, h),
         he_to_pos_2d(m, pos, m.half_edges@[h].twin as int)
@@ -167,44 +167,44 @@ pub proof fn lemma_twin_reverses_edge_direction<T: OrderedRing>(
 {
     let t = m.half_edges@[h].twin as int;
 
-    // geometric_embedding_2d implies structurally_valid, which implies
-    // shared_edge_orientation_consistency, which implies twin_endpoint_correspondence.
+    //  geometric_embedding_2d implies structurally_valid, which implies
+    //  shared_edge_orientation_consistency, which implies twin_endpoint_correspondence.
     assert(structurally_valid(m));
     assert(shared_edge_orientation_consistency(m));
     assert(twin_endpoint_correspondence(m));
     assert(twin_endpoint_correspondence_at(m, h));
 
-    // twin_endpoint_correspondence_at(m, h) gives us:
-    //   half_edge_from_vertex(m, t) == half_edge_to_vertex(m, h)
-    //   half_edge_to_vertex(m, t) == half_edge_from_vertex(m, h)
+    //  twin_endpoint_correspondence_at(m, h) gives us:
+    //    half_edge_from_vertex(m, t) == half_edge_to_vertex(m, h)
+    //    half_edge_to_vertex(m, t) == half_edge_from_vertex(m, h)
     //
-    // Expanding:
-    //   m.half_edges@[t].vertex == m.half_edges@[m.half_edges@[h].next as int].vertex
-    //   m.half_edges@[m.half_edges@[t].next as int].vertex == m.half_edges@[h].vertex
+    //  Expanding:
+    //    m.half_edges@[t].vertex == m.half_edges@[m.half_edges@[h].next as int].vertex
+    //    m.half_edges@[m.half_edges@[t].next as int].vertex == m.half_edges@[h].vertex
 
-    // First ensures: he_from_pos_2d(m, pos, t) == he_to_pos_2d(m, pos, h)
-    // LHS = pos[m.half_edges@[t].vertex as int]
-    // RHS = pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]
-    // These are equal because half_edge_from_vertex(m, t) == half_edge_to_vertex(m, h)
+    //  First ensures: he_from_pos_2d(m, pos, t) == he_to_pos_2d(m, pos, h)
+    //  LHS = pos[m.half_edges@[t].vertex as int]
+    //  RHS = pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]
+    //  These are equal because half_edge_from_vertex(m, t) == half_edge_to_vertex(m, h)
     assert(m.half_edges@[t].vertex as int
         == m.half_edges@[m.half_edges@[h].next as int].vertex as int);
 
-    // Second ensures: he_to_pos_2d(m, pos, t) == he_from_pos_2d(m, pos, h)
-    // LHS = pos[m.half_edges@[m.half_edges@[t].next as int].vertex as int]
-    // RHS = pos[m.half_edges@[h].vertex as int]
-    // These are equal because half_edge_to_vertex(m, t) == half_edge_from_vertex(m, h)
+    //  Second ensures: he_to_pos_2d(m, pos, t) == he_from_pos_2d(m, pos, h)
+    //  LHS = pos[m.half_edges@[m.half_edges@[t].next as int].vertex as int]
+    //  RHS = pos[m.half_edges@[h].vertex as int]
+    //  These are equal because half_edge_to_vertex(m, t) == half_edge_from_vertex(m, h)
     assert(m.half_edges@[m.half_edges@[t].next as int].vertex as int
         == m.half_edges@[h].vertex as int);
 }
 
-// =============================================================================
-// 7.4b Twin orientation flip (2D)
-// =============================================================================
+//  =============================================================================
+//  7.4b Twin orientation flip (2D)
+//  =============================================================================
 
-/// Twin traversal flips the orient2d sign for any third point p.
+///  Twin traversal flips the orient2d sign for any third point p.
 ///
-/// Since twin swaps from/to, orient2d(from(twin), to(twin), p)
-/// has opposite sign to orient2d(from(h), to(h), p).
+///  Since twin swaps from/to, orient2d(from(twin), to(twin), p)
+///  has opposite sign to orient2d(from(h), to(h), p).
 pub proof fn lemma_twin_orientation_flip_2d<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point2<T>>, h: int, p: Point2<T>,
 )
@@ -226,28 +226,28 @@ pub proof fn lemma_twin_orientation_flip_2d<T: OrderedRing>(
             OrientationSign::Zero => OrientationSign::Zero,
         },
 {
-    // Twin swaps from/to
+    //  Twin swaps from/to
     lemma_twin_reverses_edge_direction(m, pos, h);
     let from_h = he_from_pos_2d(m, pos, h);
     let to_h = he_to_pos_2d(m, pos, h);
     let t = m.half_edges@[h].twin as int;
 
-    // from(twin) == to(h), to(twin) == from(h)
+    //  from(twin) == to(h), to(twin) == from(h)
     assert(he_from_pos_2d(m, pos, t) == to_h);
     assert(he_to_pos_2d(m, pos, t) == from_h);
 
-    // orient2d_sign(to_h, from_h, p) flips orient2d_sign(from_h, to_h, p)
+    //  orient2d_sign(to_h, from_h, p) flips orient2d_sign(from_h, to_h, p)
     lemma_orient2d_sign_swap_ab::<T>(from_h, to_h, p);
 }
 
-// =============================================================================
-// 7.5 Face outward normal (3D)
-// =============================================================================
+//  =============================================================================
+//  7.5 Face outward normal (3D)
+//  =============================================================================
 
-/// Face f has an outward-pointing normal with respect to an interior point.
-/// The face normal (computed from the first 3 vertices) points away from
-/// the interior, meaning orient3d(v0, v1, v2, interior) is negative
-/// (interior is below the plane of the face).
+///  Face f has an outward-pointing normal with respect to an interior point.
+///  The face normal (computed from the first 3 vertices) points away from
+///  the interior, meaning orient3d(v0, v1, v2, interior) is negative
+///  (interior is below the plane of the face).
 pub open spec fn face_outward_normal_3d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point3<T>>,
@@ -269,7 +269,7 @@ pub open spec fn face_outward_normal_3d<T: OrderedRing>(
     orient3d_sign(a, b, c, interior) == OrientationSign::Negative
 }
 
-/// All faces have outward-pointing normals (closed, consistently oriented 3D mesh).
+///  All faces have outward-pointing normals (closed, consistently oriented 3D mesh).
 pub open spec fn consistently_oriented_3d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point3<T>>,
@@ -283,14 +283,14 @@ pub open spec fn consistently_oriented_3d<T: OrderedRing>(
             ==> face_outward_normal_3d(m, pos, f, interior)
 }
 
-// =============================================================================
-// 7.6 Edge diamond and Delaunay predicates
-// =============================================================================
+//  =============================================================================
+//  7.6 Edge diamond and Delaunay predicates
+//  =============================================================================
 
-/// Extract the 4 vertices of the "diamond" around edge e in 2D:
-/// (from(h), to(h), opposite_left, opposite_right)
-/// where h = edge_half_edges[e], opposite_left = next(next(h)).vertex,
-/// and opposite_right = next(next(twin(h))).vertex.
+///  Extract the 4 vertices of the "diamond" around edge e in 2D:
+///  (from(h), to(h), opposite_left, opposite_right)
+///  where h = edge_half_edges[e], opposite_left = next(next(h)).vertex,
+///  and opposite_right = next(next(twin(h))).vertex.
 pub open spec fn edge_diamond_2d<T: Ring>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -303,15 +303,15 @@ pub open spec fn edge_diamond_2d<T: Ring>(
 {
     let h = m.edge_half_edges@[e] as int;
     let t = m.half_edges@[h].twin as int;
-    let a = pos[m.half_edges@[h].vertex as int];                            // from(h)
-    let b = pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]; // to(h)
-    let c = pos[m.half_edges@[m.half_edges@[m.half_edges@[h].next as int].next as int].vertex as int]; // opposite_left
-    let d = pos[m.half_edges@[m.half_edges@[m.half_edges@[t].next as int].next as int].vertex as int]; // opposite_right
+    let a = pos[m.half_edges@[h].vertex as int];                            //  from(h)
+    let b = pos[m.half_edges@[m.half_edges@[h].next as int].vertex as int]; //  to(h)
+    let c = pos[m.half_edges@[m.half_edges@[m.half_edges@[h].next as int].next as int].vertex as int]; //  opposite_left
+    let d = pos[m.half_edges@[m.half_edges@[m.half_edges@[t].next as int].next as int].vertex as int]; //  opposite_right
     (a, b, c, d)
 }
 
-/// Edge e is locally Delaunay in 2D: d is NOT inside the circumcircle of (a, b, c)
-/// where (a, b, c, d) is the edge diamond.
+///  Edge e is locally Delaunay in 2D: d is NOT inside the circumcircle of (a, b, c)
+///  where (a, b, c, d) is the edge diamond.
 pub open spec fn edge_delaunay_2d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -326,7 +326,7 @@ pub open spec fn edge_delaunay_2d<T: OrderedRing>(
     is_locally_delaunay_edge_2d(a, b, c, d)
 }
 
-/// All edges in the mesh are locally Delaunay in 2D.
+///  All edges in the mesh are locally Delaunay in 2D.
 pub open spec fn is_locally_delaunay_mesh_2d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point2<T>>,
@@ -337,7 +337,7 @@ pub open spec fn is_locally_delaunay_mesh_2d<T: OrderedRing>(
     forall|e: int| 0 <= e < edge_count(m) ==> edge_delaunay_2d(m, pos, e)
 }
 
-/// The mesh forms a convex hull of the given 3D point set: closed + all faces are hull faces.
+///  The mesh forms a convex hull of the given 3D point set: closed + all faces are hull faces.
 pub open spec fn is_convex_hull_mesh_3d<T: OrderedRing>(
     m: &Mesh,
     pos: Seq<Point3<T>>,
@@ -359,4 +359,4 @@ pub open spec fn is_convex_hull_mesh_3d<T: OrderedRing>(
     }
 }
 
-} // verus!
+} //  verus!

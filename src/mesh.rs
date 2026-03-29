@@ -56,4 +56,4 @@ pub open spec fn index_bounds(m: &Mesh) -> bool {
     }
 }
 
-} // verus!
+} //  verus!

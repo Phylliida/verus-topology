@@ -18,11 +18,11 @@ use crate::geometric_checkers::*;
 
 verus! {
 
-// =============================================================================
-// Spec layer: ray-face intersection and crossing count
-// =============================================================================
+//  =============================================================================
+//  Spec layer: ray-face intersection and crossing count
+//  =============================================================================
 
-/// Extract the three vertex positions of face f (assumes triangular face).
+///  Extract the three vertex positions of face f (assumes triangular face).
 pub open spec fn face_tri_v0<T: Ring>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int,
 ) -> Point3<T>
@@ -62,8 +62,8 @@ pub open spec fn face_tri_v2<T: Ring>(
     pos[m.half_edges@[h2].vertex as int]
 }
 
-/// Does the ray from `origin` in direction `dir` hit face `f`?
-/// Uses the division-free Moller-Trumbore test.
+///  Does the ray from `origin` in direction `dir` hit face `f`?
+///  Uses the division-free Moller-Trumbore test.
 pub open spec fn ray_hits_face<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int,
     origin: Point3<T>, dir: Vec3<T>,
@@ -81,7 +81,7 @@ pub open spec fn ray_hits_face<T: OrderedRing>(
     )
 }
 
-/// Number of faces hit by the ray, counting faces 0..n.
+///  Number of faces hit by the ray, counting faces 0..n.
 pub open spec fn ray_crossing_count_prefix<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -101,7 +101,7 @@ pub open spec fn ray_crossing_count_prefix<T: OrderedRing>(
     }
 }
 
-/// Total number of faces hit by the ray.
+///  Total number of faces hit by the ray.
 pub open spec fn ray_crossing_count<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -113,7 +113,7 @@ pub open spec fn ray_crossing_count<T: OrderedRing>(
     ray_crossing_count_prefix(m, pos, origin, dir, face_count(m) as int)
 }
 
-/// A point is inside the solid if the ray crossing count is odd.
+///  A point is inside the solid if the ray crossing count is odd.
 pub open spec fn point_in_solid<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -121,11 +121,11 @@ pub open spec fn point_in_solid<T: OrderedRing>(
     ray_crossing_count(m, pos, origin, dir) % 2 == 1
 }
 
-// =============================================================================
-// Proof helpers
-// =============================================================================
+//  =============================================================================
+//  Proof helpers
+//  =============================================================================
 
-/// Prefix count unfold: adding one more face.
+///  Prefix count unfold: adding one more face.
 proof fn lemma_prefix_unfold<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -138,10 +138,10 @@ proof fn lemma_prefix_unfold<T: OrderedRing>(
             == ray_crossing_count_prefix(m, pos, origin, dir, n - 1)
                 + if ray_hits_face(m, pos, n - 1, origin, dir) { 1int } else { 0int },
 {
-    // Follows directly from the recursive definition
+    //  Follows directly from the recursive definition
 }
 
-/// Prefix count is non-negative.
+///  Prefix count is non-negative.
 proof fn lemma_prefix_nonneg<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -158,7 +158,7 @@ proof fn lemma_prefix_nonneg<T: OrderedRing>(
     }
 }
 
-/// Bridge: ray_hits_triangle_nodiv_exec result matches ray_hits_face spec.
+///  Bridge: ray_hits_triangle_nodiv_exec result matches ray_hits_face spec.
 proof fn lemma_ray_hits_face_bridge(
     m: &Mesh, pos: &Vec<RuntimePoint3>,
     f: int,
@@ -193,11 +193,11 @@ proof fn lemma_ray_hits_face_bridge(
     assert(pv[v2] == pos@[v2]@);
 }
 
-// =============================================================================
-// Exec layer: runtime point-in-solid checker
-// =============================================================================
+//  =============================================================================
+//  Exec layer: runtime point-in-solid checker
+//  =============================================================================
 
-/// Count the number of mesh faces hit by a ray (runtime).
+///  Count the number of mesh faces hit by a ray (runtime).
 pub fn ray_crossing_count_exec(
     m: &Mesh, pos: &Vec<RuntimePoint3>,
     origin: &RuntimePoint3, dir: &RuntimeVec3,
@@ -209,7 +209,7 @@ pub fn ray_crossing_count_exec(
         positions_wf_3d(pos),
         origin.wf_spec(),
         dir.wf_spec(),
-        // Overflow guard: face count fits in usize
+        //  Overflow guard: face count fits in usize
         face_count(m) < usize::MAX,
     ensures
         count as int == ray_crossing_count::<RationalModel>(
@@ -265,14 +265,14 @@ pub fn ray_crossing_count_exec(
     count
 }
 
-/// Check whether a point is inside a closed, consistently-oriented triangle mesh.
+///  Check whether a point is inside a closed, consistently-oriented triangle mesh.
 ///
-/// Casts a ray from `origin` in direction `dir` and counts the number of
-/// face crossings. An odd count means the point is inside.
+///  Casts a ray from `origin` in direction `dir` and counts the number of
+///  face crossings. An odd count means the point is inside.
 ///
-/// The caller must ensure the ray is in "general position" — it should not
-/// pass through any edge or vertex of the mesh. With exact rational arithmetic,
-/// this can be checked or guaranteed by perturbation.
+///  The caller must ensure the ray is in "general position" — it should not
+///  pass through any edge or vertex of the mesh. With exact rational arithmetic,
+///  this can be checked or guaranteed by perturbation.
 pub fn check_point_in_solid(
     m: &Mesh, pos: &Vec<RuntimePoint3>,
     origin: &RuntimePoint3, dir: &RuntimeVec3,
@@ -294,11 +294,11 @@ pub fn check_point_in_solid(
     count % 2 == 1
 }
 
-// =============================================================================
-// Crossing count bounds
-// =============================================================================
+//  =============================================================================
+//  Crossing count bounds
+//  =============================================================================
 
-/// Crossing count prefix is bounded by n.
+///  Crossing count prefix is bounded by n.
 pub proof fn lemma_crossing_count_bounded<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -315,7 +315,7 @@ pub proof fn lemma_crossing_count_bounded<T: OrderedRing>(
     }
 }
 
-/// Total crossing count is bounded by face count.
+///  Total crossing count is bounded by face count.
 pub proof fn lemma_crossing_count_total_bounded<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -326,11 +326,11 @@ pub proof fn lemma_crossing_count_total_bounded<T: OrderedRing>(
     lemma_crossing_count_bounded::<T>(m, pos, origin, dir, face_count(m) as int);
 }
 
-// =============================================================================
-// General position: ray doesn't hit any face boundary
-// =============================================================================
+//  =============================================================================
+//  General position: ray doesn't hit any face boundary
+//  =============================================================================
 
-/// The four Moller-Trumbore parameters for face f, lifted to the mesh.
+///  The four Moller-Trumbore parameters for face f, lifted to the mesh.
 pub open spec fn ray_face_det<T: Ring>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int, dir: Vec3<T>,
 ) -> T
@@ -366,9 +366,9 @@ pub open spec fn ray_face_t<T: Ring>(
     ray_tri_t_unnorm(origin, dir, face_tri_v0(m, pos, f), face_tri_v1(m, pos, f), face_tri_v2(m, pos, f))
 }
 
-/// Face f is in general position w.r.t. the ray: either the ray is parallel
-/// to the face (det ≡ 0, automatic miss), or none of {u, v, det-u-v, t}
-/// are zero (strictly interior or strictly exterior hit).
+///  Face f is in general position w.r.t. the ray: either the ray is parallel
+///  to the face (det ≡ 0, automatic miss), or none of {u, v, det-u-v, t}
+///  are zero (strictly interior or strictly exterior hit).
 pub open spec fn ray_face_general_position<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int,
     origin: Point3<T>, dir: Vec3<T>,
@@ -387,8 +387,8 @@ pub open spec fn ray_face_general_position<T: OrderedRing>(
     )
 }
 
-/// The ray is in general position w.r.t. the entire mesh: every face
-/// satisfies `ray_face_general_position`.
+///  The ray is in general position w.r.t. the entire mesh: every face
+///  satisfies `ray_face_general_position`.
 pub open spec fn ray_general_position<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -399,7 +399,7 @@ pub open spec fn ray_general_position<T: OrderedRing>(
         ray_face_general_position(m, pos, f, origin, dir)
 }
 
-/// Bridge: exec computation of Moller-Trumbore parameters matches face-level specs.
+///  Bridge: exec computation of Moller-Trumbore parameters matches face-level specs.
 proof fn lemma_ray_face_params_bridge(
     m: &Mesh, pos: &Vec<RuntimePoint3>,
     f: int, origin: &RuntimePoint3, dir: &RuntimeVec3,
@@ -436,11 +436,11 @@ proof fn lemma_ray_face_params_bridge(
     assert(pv[v2] == pos@[v2]@);
 }
 
-/// Check that the ray is in general position w.r.t. all mesh faces.
+///  Check that the ray is in general position w.r.t. all mesh faces.
 ///
-/// For each face, computes the Moller-Trumbore determinant, barycentric
-/// coordinates (u, v), and ray parameter (t). Returns false if any face
-/// has a boundary hit (any of det, u, v, det-u-v, or t is zero).
+///  For each face, computes the Moller-Trumbore determinant, barycentric
+///  coordinates (u, v), and ray parameter (t). Returns false if any face
+///  has a boundary hit (any of det, u, v, det-u-v, or t is zero).
 pub fn check_ray_general_position(
     m: &Mesh, pos: &Vec<RuntimePoint3>,
     origin: &RuntimePoint3, dir: &RuntimeVec3,
@@ -486,14 +486,14 @@ pub fn check_ray_general_position(
         let vi1 = m.half_edges[h1].vertex;
         let vi2 = m.half_edges[h2].vertex;
 
-        // Compute Moller-Trumbore parameters
+        //  Compute Moller-Trumbore parameters
         let e1 = sub3_exec(&pos[vi1], &pos[vi0]);
         let e2 = sub3_exec(&pos[vi2], &pos[vi0]);
         let p = cross_exec(dir, &e2);
         let det = dot3_exec(&e1, &p);
 
         if det.eq(&zero) {
-            // Ray parallel to face — automatic miss, general position OK
+            //  Ray parallel to face — automatic miss, general position OK
             proof {
                 assert(det@.eqv_spec(zero@));
                 assert(det@ == ray_tri_det::<RationalModel>(
@@ -532,18 +532,18 @@ pub fn check_ray_general_position(
     true
 }
 
-// =============================================================================
-// Signed crossings: connecting det sign to face orientation
-// =============================================================================
+//  =============================================================================
+//  Signed crossings: connecting det sign to face orientation
+//  =============================================================================
 
-/// The sign of the ray-face determinant determines whether the ray
-/// enters or exits the solid through face f.
+///  The sign of the ray-face determinant determines whether the ray
+///  enters or exits the solid through face f.
 ///
-/// - det > 0: ray goes against the outward face normal (entering)
-/// - det < 0: ray goes with the outward face normal (exiting)
+///  - det > 0: ray goes against the outward face normal (entering)
+///  - det < 0: ray goes with the outward face normal (exiting)
 ///
-/// This follows from: ray_tri_det(dir, v0, v1, v2) = triple(e1, dir, e2)
-/// = -triple(e1, e2, dir) = -dot(normal, dir), where normal = cross(e1, e2).
+///  This follows from: ray_tri_det(dir, v0, v1, v2) = triple(e1, dir, e2)
+///  = -triple(e1, e2, dir) = -dot(normal, dir), where normal = cross(e1, e2).
 pub open spec fn ray_entering_face<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int, dir: Vec3<T>,
 ) -> bool
@@ -560,7 +560,7 @@ pub open spec fn ray_exiting_face<T: OrderedRing>(
     ray_face_det(m, pos, f, dir).lt(T::zero())
 }
 
-/// Signed crossing contribution for face f: +1 (entering), -1 (exiting), 0 (miss).
+///  Signed crossing contribution for face f: +1 (entering), -1 (exiting), 0 (miss).
 pub open spec fn ray_crossing_sign<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>, f: int,
     origin: Point3<T>, dir: Vec3<T>,
@@ -576,7 +576,7 @@ pub open spec fn ray_crossing_sign<T: OrderedRing>(
     }
 }
 
-/// Signed crossing count (prefix sum).
+///  Signed crossing count (prefix sum).
 pub open spec fn ray_signed_crossing_prefix<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -593,7 +593,7 @@ pub open spec fn ray_signed_crossing_prefix<T: OrderedRing>(
     }
 }
 
-/// Total signed crossing count.
+///  Total signed crossing count.
 pub open spec fn ray_signed_crossing_count<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -603,14 +603,14 @@ pub open spec fn ray_signed_crossing_count<T: OrderedRing>(
     ray_signed_crossing_prefix(m, pos, origin, dir, face_count(m) as int)
 }
 
-/// The determinant equals -triple(e1, e2, dir), connecting the Moller-Trumbore
-/// determinant to the face normal direction.
+///  The determinant equals -triple(e1, e2, dir), connecting the Moller-Trumbore
+///  determinant to the face normal direction.
 ///
-/// ray_tri_det(dir, v0, v1, v2)
-///   = triple(e1, dir, e2)         [definition]
-///   ≡ -triple(e1, e2, dir)        [swap last two: triple(a, c, b) ≡ -triple(a, b, c)]
-///   = -dot(cross(e1, e2), dir)    [definition of triple]
-///   = -dot(face_normal, dir)
+///  ray_tri_det(dir, v0, v1, v2)
+///    = triple(e1, dir, e2)         [definition]
+///    ≡ -triple(e1, e2, dir)        [swap last two: triple(a, c, b) ≡ -triple(a, b, c)]
+///    = -dot(cross(e1, e2), dir)    [definition of triple]
+///    = -dot(face_normal, dir)
 pub proof fn lemma_det_is_neg_triple_normal_dir<T: Ring>(
     dir: Vec3<T>, v0: Point3<T>, v1: Point3<T>, v2: Point3<T>,
 )
@@ -621,16 +621,16 @@ pub proof fn lemma_det_is_neg_triple_normal_dir<T: Ring>(
 {
     let e1 = edge1(v0, v1);
     let e2 = edge2(v0, v2);
-    // triple(e1, dir, e2) ≡ -triple(e1, e2, dir)  [swap_23]
+    //  triple(e1, dir, e2) ≡ -triple(e1, e2, dir)  [swap_23]
     lemma_triple_swap_23(e1, e2, dir);
-    // lemma_triple_swap_23 gives: triple(e1, dir, e2) ≡ triple(e1, e2, dir).neg()
-    // And ray_tri_det(dir, v0, v1, v2) = triple(e1, dir, e2) by definition
+    //  lemma_triple_swap_23 gives: triple(e1, dir, e2) ≡ triple(e1, e2, dir).neg()
+    //  And ray_tri_det(dir, v0, v1, v2) = triple(e1, dir, e2) by definition
 }
 
-/// Signed and unsigned crossing counts have the same parity.
+///  Signed and unsigned crossing counts have the same parity.
 ///
-/// Each hit contributes +1 to unsigned and ±1 to signed. The difference
-/// per exit is 2 (unsigned +1, signed -1), so they agree mod 2.
+///  Each hit contributes +1 to unsigned and ±1 to signed. The difference
+///  per exit is 2 (unsigned +1, signed -1), so they agree mod 2.
 pub proof fn lemma_signed_unsigned_parity<T: OrderedRing>(
     m: &Mesh, pos: Seq<Point3<T>>,
     origin: Point3<T>, dir: Vec3<T>,
@@ -638,7 +638,7 @@ pub proof fn lemma_signed_unsigned_parity<T: OrderedRing>(
 )
     requires
         0 <= n,
-        // Under general position, every hit has det != 0
+        //  Under general position, every hit has det != 0
         forall|f: int| 0 <= f < n ==>
             ray_face_general_position(m, pos, f, origin, dir),
     ensures
@@ -654,22 +654,22 @@ pub proof fn lemma_signed_unsigned_parity<T: OrderedRing>(
         let f = n - 1;
 
         if ray_hits_face(m, pos, f, origin, dir) {
-            // Face f is hit. Under general position, det != 0.
-            // So crossing_sign is +1 or -1. Either way, parity flips for both.
+            //  Face f is hit. Under general position, det != 0.
+            //  So crossing_sign is +1 or -1. Either way, parity flips for both.
             assert(ray_face_general_position(m, pos, f, origin, dir));
             let det = ray_face_det(m, pos, f, dir);
 
-            // The hit means det != 0 (ray_hits_triangle_nodiv returns false when det ≡ 0)
-            // Under general position, det is nonzero.
-            // So crossing_sign is +1 (entering) or -1 (exiting).
-            // unsigned goes prev + 1, signed goes prev ± 1.
-            // In both cases parity flips: (prev + 1) % 2 != prev % 2,
-            // and (prev ± 1) % 2 != prev % 2.
-            // So they still agree mod 2.
+            //  The hit means det != 0 (ray_hits_triangle_nodiv returns false when det ≡ 0)
+            //  Under general position, det is nonzero.
+            //  So crossing_sign is +1 (entering) or -1 (exiting).
+            //  unsigned goes prev + 1, signed goes prev ± 1.
+            //  In both cases parity flips: (prev + 1) % 2 != prev % 2,
+            //  and (prev ± 1) % 2 != prev % 2.
+            //  So they still agree mod 2.
         } else {
-            // Face f is not hit: +0 to both. Parity unchanged.
+            //  Face f is not hit: +0 to both. Parity unchanged.
         }
     }
 }
 
-} // verus!
+} //  verus!

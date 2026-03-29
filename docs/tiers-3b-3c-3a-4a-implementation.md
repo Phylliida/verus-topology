@@ -17,7 +17,7 @@ pub open spec fn genus_spec(m: &Mesh) -> int {
     (2 - euler_characteristic_spec(m)) / 2
 }
 
-/// Genus from raw V, E, F counts (needed for subdivision where counts are formulas, not a Mesh).
+///  Genus from raw V, E, F counts (needed for subdivision where counts are formulas, not a Mesh).
 pub open spec fn genus_from_counts_spec(v: int, e: int, f: int) -> int {
     (2 - (v - e + f)) / 2
 }
@@ -28,12 +28,12 @@ pub open spec fn genus_from_counts_spec(v: int, e: int, f: int) -> int {
 pub proof fn lemma_tetrahedron_genus_zero(m: &Mesh)
     requires vertex_count(m) == 4, edge_count(m) == 6, face_count(m) == 4,
     ensures genus_spec(m) == 0,
-{ }  // (2 - (4-6+4)) / 2 = 0
+{ }  //  (2 - (4-6+4)) / 2 = 0
 
 pub proof fn lemma_cube_genus_zero(m: &Mesh)
     requires vertex_count(m) == 8, edge_count(m) == 12, face_count(m) == 6,
     ensures genus_spec(m) == 0,
-{ }  // (2 - (8-12+6)) / 2 = 0
+{ }  //  (2 - (8-12+6)) / 2 = 0
 ```
 
 ### 1c. Subdivision preserves genus
@@ -45,7 +45,7 @@ pub proof fn lemma_subdivision_preserves_genus(m: &Mesh)
     ) == genus_spec(m),
 {
     lemma_subdivision_preserves_euler(m);
-    // Z3 sees: sub_V - sub_E + sub_F == chi(m), so both genus expressions use same chi.
+    //  Z3 sees: sub_V - sub_E + sub_F == chi(m), so both genus expressions use same chi.
 }
 ```
 
@@ -182,7 +182,7 @@ pub fn check_topological_sphere(m: &Mesh) -> (out: bool)
     let vcnt = m.vertex_half_edges.len();
     let ecnt = m.edge_half_edges.len();
     let fcnt = m.face_half_edges.len();
-    // Overflow guards
+    //  Overflow guards
     if vcnt >= isize::MAX as usize { return false; }
     if ecnt >= isize::MAX as usize { return false; }
     if fcnt >= isize::MAX as usize { return false; }

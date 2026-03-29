@@ -6,9 +6,9 @@ use crate::checker_proofs::*;
 
 verus! {
 
-// =============================================================================
-// Checker 1: Index bounds (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 1: Index bounds (iff)
+//  =============================================================================
 
 pub fn check_index_bounds(m: &Mesh) -> (out: bool)
     ensures
@@ -115,9 +115,9 @@ pub fn check_index_bounds(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Checker 2: Twin involution (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 2: Twin involution (iff)
+//  =============================================================================
 
 pub fn check_twin_involution(m: &Mesh) -> (out: bool)
     ensures
@@ -155,9 +155,9 @@ pub fn check_twin_involution(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Checker 3: Prev/next bidirectional (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 3: Prev/next bidirectional (iff)
+//  =============================================================================
 
 fn check_next_prev_inverse(m: &Mesh) -> (out: bool)
     ensures
@@ -277,9 +277,9 @@ pub fn check_prev_inverse_of_next(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Checker 4: No degenerate edges (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 4: No degenerate edges (iff)
+//  =============================================================================
 
 pub fn check_no_degenerate_edges(m: &Mesh) -> (out: bool)
     ensures
@@ -323,9 +323,9 @@ pub fn check_no_degenerate_edges(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Checker 5: Shared edge orientation consistency (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 5: Shared edge orientation consistency (iff)
+//  =============================================================================
 
 pub fn check_shared_edge_orientation_consistency(m: &Mesh) -> (out: bool)
     ensures
@@ -494,9 +494,9 @@ pub fn check_shared_edge_orientation_consistency(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Checker 6: Face cycles (sound, ==>)
-// =============================================================================
+//  =============================================================================
+//  Checker 6: Face cycles (sound, ==>)
+//  =============================================================================
 
 pub fn check_face_cycles(m: &Mesh) -> (out: bool)
     ensures
@@ -1122,9 +1122,9 @@ pub fn check_face_cycles(m: &Mesh) -> (out: bool)
     true
 }
 
-// =============================================================================
-// Checker 7: Vertex manifold (sound, ==>)
-// =============================================================================
+//  =============================================================================
+//  Checker 7: Vertex manifold (sound, ==>)
+//  =============================================================================
 
 pub fn check_vertex_manifold(m: &Mesh) -> (out: bool)
     ensures
@@ -1553,9 +1553,9 @@ pub fn check_vertex_manifold(m: &Mesh) -> (out: bool)
     true
 }
 
-// =============================================================================
-// Checker 8: Edge twin duality (iff)
-// =============================================================================
+//  =============================================================================
+//  Checker 8: Edge twin duality (iff)
+//  =============================================================================
 
 pub fn check_edge_twin_duality(m: &Mesh) -> (out: bool)
     ensures
@@ -1705,9 +1705,9 @@ pub fn check_edge_twin_duality(m: &Mesh) -> (out: bool)
     ok
 }
 
-// =============================================================================
-// Composite: check_structurally_valid (sound, ==>)
-// =============================================================================
+//  =============================================================================
+//  Composite: check_structurally_valid (sound, ==>)
+//  =============================================================================
 
 pub fn check_structurally_valid(m: &Mesh) -> (out: bool)
     ensures
@@ -1745,7 +1745,7 @@ pub fn check_structurally_valid(m: &Mesh) -> (out: bool)
     if !edge_ok {
         return false;
     }
-    // Check counting invariant: 2E == HE
+    //  Check counting invariant: 2E == HE
     let ecnt = m.edge_half_edges.len();
     let hcnt = m.half_edges.len();
     if ecnt > usize::MAX / 2 {
@@ -1754,7 +1754,7 @@ pub fn check_structurally_valid(m: &Mesh) -> (out: bool)
     if 2 * ecnt != hcnt {
         return false;
     }
-    // Check counting invariant: HE >= 3F
+    //  Check counting invariant: HE >= 3F
     let fcnt = m.face_half_edges.len();
     if fcnt > usize::MAX / 3 {
         return false;
@@ -1765,4 +1765,4 @@ pub fn check_structurally_valid(m: &Mesh) -> (out: bool)
     true
 }
 
-} // verus!
+} //  verus!

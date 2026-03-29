@@ -137,4 +137,4 @@ pub proof fn lemma_vertex_ring_iter_in_bounds(m: &Mesh, h: int, n: nat)
     }
 }
 
-} // verus!
+} //  verus!

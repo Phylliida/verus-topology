@@ -5,11 +5,11 @@ use crate::invariants::*;
 
 verus! {
 
-// =============================================================================
-// Helper for check_edge_twin_duality: positive case
-// =============================================================================
+//  =============================================================================
+//  Helper for check_edge_twin_duality: positive case
+//  =============================================================================
 
-/// Proves edge_exactly_two_half_edges_at(m, e) from concrete witnesses.
+///  Proves edge_exactly_two_half_edges_at(m, e) from concrete witnesses.
 pub(crate) proof fn lemma_prove_edge_exactly_two_at(
     m: &Mesh,
     e: int,
@@ -34,14 +34,14 @@ pub(crate) proof fn lemma_prove_edge_exactly_two_at(
     ensures
         edge_exactly_two_half_edges_at(m, e),
 {
-    // Z3 auto-closes: existential witnesses are directly in requires
+    //  Z3 auto-closes: existential witnesses are directly in requires
 }
 
-// =============================================================================
-// Helper for check_edge_twin_duality: negative case
-// =============================================================================
+//  =============================================================================
+//  Helper for check_edge_twin_duality: negative case
+//  =============================================================================
 
-/// Proves !edge_exactly_two_half_edges_at(m, e) by contradiction from failure evidence.
+///  Proves !edge_exactly_two_half_edges_at(m, e) by contradiction from failure evidence.
 pub(crate) proof fn lemma_disprove_edge_exactly_two_at(
     m: &Mesh,
     e: int,
@@ -61,7 +61,7 @@ pub(crate) proof fn lemma_disprove_edge_exactly_two_at(
         hcnt == half_edge_count(m),
         count_two == (!too_many && count == 2),
         0 <= count <= 2,
-        // Inner loop postcondition:
+        //  Inner loop postcondition:
         count == 0 ==> forall|j: int|
             0 <= j < hcnt ==> (#[trigger] m.half_edges@[j].edge as int) != e,
         count >= 1 ==> {
@@ -86,14 +86,14 @@ pub(crate) proof fn lemma_disprove_edge_exactly_two_at(
         !too_many && count == 2 ==> forall|j: int|
             0 <= j < hcnt && (#[trigger] m.half_edges@[j].edge as int) == e
                 ==> (j == h0 || j == h1),
-        // Twins/rep (only meaningful when count_two):
+        //  Twins/rep (only meaningful when count_two):
         count_two ==> {
             &&& 0 <= h0 < hcnt
             &&& 0 <= h1 < hcnt
         },
         twins_ok == (count_two && m.half_edges@[h0].twin as int == h1 && m.half_edges@[h1].twin as int == h0),
         rep_ok == (count_two && (m.edge_half_edges@[e] as int == h0 || m.edge_half_edges@[e] as int == h1)),
-        // The edge check failed:
+        //  The edge check failed:
         !(count_two && twins_ok && rep_ok),
     ensures
         !edge_exactly_two_half_edges_at(m, e),
@@ -186,11 +186,11 @@ pub(crate) proof fn lemma_disprove_edge_exactly_two_at(
     }
 }
 
-// =============================================================================
-// Helper for check_face_cycles: inner loop step
-// =============================================================================
+//  =============================================================================
+//  Helper for check_face_cycles: inner loop step
+//  =============================================================================
 
-/// Proves all 7 loop invariant updates for one step of the face cycle traversal.
+///  Proves all 7 loop invariant updates for one step of the face cycle traversal.
 pub(crate) proof fn lemma_face_cycle_step(
     m: &Mesh,
     start: int,
@@ -223,7 +223,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         global_seen.len() == hcnt,
         local_seen == local_seen_before.update(h_prev, true),
         global_seen == global_seen_before_iter.update(h_prev, true),
-        // Old invariants:
+        //  Old invariants:
         forall|i: int|
             0 <= i < steps_prev ==> #[trigger] m.half_edges@[next_iter(
                 m, start, i as nat,
@@ -249,10 +249,10 @@ pub(crate) proof fn lemma_face_cycle_step(
             0 <= i < j < steps_prev
                 ==> next_iter(m, start, i as nat) != next_iter(m, start, j as nat),
     ensures
-        // Updated h:
+        //  Updated h:
         next_or_self(m, h_prev) < hcnt,
         m.half_edges@[h_prev].next as int == next_iter(m, start, steps as nat),
-        // 7 updated invariants:
+        //  7 updated invariants:
         forall|i: int|
             0 <= i < steps ==> #[trigger] m.half_edges@[next_iter(
                 m, start, i as nat,
@@ -285,7 +285,7 @@ pub(crate) proof fn lemma_face_cycle_step(
     assert(next_or_self(m, h_prev) == m.half_edges@[h_prev].next as int);
     assert(m.half_edges@[h_prev].next as int == next_iter(m, start, steps as nat));
 
-    // Invariant 1: face membership
+    //  Invariant 1: face membership
     assert forall|i: int|
         0 <= i < steps implies #[trigger] m.half_edges@[next_iter(
             m, start, i as nat,
@@ -297,7 +297,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         }
     };
 
-    // Invariant 2: local_seen → exists i
+    //  Invariant 2: local_seen → exists i
     assert forall|hp: int|
         0 <= hp < hcnt && #[trigger] local_seen[hp]
             implies exists|i: int| {
@@ -319,7 +319,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         }
     };
 
-    // Invariant 3: local_seen → global_seen
+    //  Invariant 3: local_seen → global_seen
     assert forall|hp: int|
         0 <= hp < hcnt && #[trigger] local_seen[hp]
             implies #[trigger] global_seen[hp] by {
@@ -332,7 +332,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         }
     };
 
-    // Invariant 4: non-local → unchanged from global_seen_before
+    //  Invariant 4: non-local → unchanged from global_seen_before
     assert forall|hp: int|
         0 <= hp < hcnt && !local_seen[hp]
             implies global_seen[hp] == global_seen_before[hp] by {
@@ -346,7 +346,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         }
     };
 
-    // Invariant 5: all iterates are locally seen
+    //  Invariant 5: all iterates are locally seen
     assert forall|i: int|
         0 <= i < steps implies #[trigger] local_seen[next_iter(
             m, start, i as nat,
@@ -368,7 +368,7 @@ pub(crate) proof fn lemma_face_cycle_step(
         }
     };
 
-    // Invariant 6: distinctness
+    //  Invariant 6: distinctness
     assert forall|i: int, j: int|
         #![trigger next_iter(m, start, i as nat), next_iter(m, start, j as nat)]
         0 <= i < j < steps
@@ -388,11 +388,11 @@ pub(crate) proof fn lemma_face_cycle_step(
     };
 }
 
-// =============================================================================
-// Helper for check_vertex_manifold: inner loop step
-// =============================================================================
+//  =============================================================================
+//  Helper for check_vertex_manifold: inner loop step
+//  =============================================================================
 
-/// Proves all 4 loop invariant updates for one step of the vertex ring traversal.
+///  Proves all 4 loop invariant updates for one step of the vertex ring traversal.
 pub(crate) proof fn lemma_vertex_ring_step(
     m: &Mesh,
     start: int,
@@ -417,7 +417,7 @@ pub(crate) proof fn lemma_vertex_ring_step(
         local_seen_before.len() == hcnt,
         local_seen.len() == hcnt,
         local_seen == local_seen_before.update(h_prev, true),
-        // Old invariants:
+        //  Old invariants:
         forall|hp: int|
             0 <= hp < hcnt && #[trigger] local_seen_before[hp]
                 ==> exists|i: int| {
@@ -437,11 +437,11 @@ pub(crate) proof fn lemma_vertex_ring_step(
             0 <= i < j < steps_prev
                 ==> vertex_ring_iter(m, start, i as nat) != vertex_ring_iter(m, start, j as nat),
     ensures
-        // Updated h:
+        //  Updated h:
         vertex_ring_succ_or_self(m, h_prev) < hcnt,
         m.half_edges@[m.half_edges@[h_prev].twin as int].next as int
             == vertex_ring_iter(m, start, steps as nat),
-        // 4 updated invariants:
+        //  4 updated invariants:
         forall|i: int|
             0 <= i < steps ==> #[trigger] m.half_edges@[vertex_ring_iter(
                 m, start, i as nat,
@@ -471,7 +471,7 @@ pub(crate) proof fn lemma_vertex_ring_step(
     assert(m.half_edges@[m.half_edges@[h_prev].twin as int].next as int
         == vertex_ring_iter(m, start, steps as nat));
 
-    // Invariant 1: vertex membership
+    //  Invariant 1: vertex membership
     assert forall|i: int|
         0 <= i < steps implies #[trigger] m.half_edges@[vertex_ring_iter(
             m, start, i as nat,
@@ -483,7 +483,7 @@ pub(crate) proof fn lemma_vertex_ring_step(
         }
     };
 
-    // Invariant 2: all iterates are locally seen
+    //  Invariant 2: all iterates are locally seen
     assert forall|i: int|
         0 <= i < steps implies #[trigger] local_seen[vertex_ring_iter(
             m, start, i as nat,
@@ -509,7 +509,7 @@ pub(crate) proof fn lemma_vertex_ring_step(
         }
     };
 
-    // Invariant 3: local_seen → exists i
+    //  Invariant 3: local_seen → exists i
     assert forall|hp: int|
         0 <= hp < hcnt && #[trigger] local_seen[hp]
             implies exists|i: int| {
@@ -531,7 +531,7 @@ pub(crate) proof fn lemma_vertex_ring_step(
         }
     };
 
-    // Invariant 4: distinctness
+    //  Invariant 4: distinctness
     assert forall|i: int, j: int|
         #![trigger vertex_ring_iter(m, start, i as nat), vertex_ring_iter(m, start, j as nat)]
         0 <= i < j < steps
@@ -548,4 +548,4 @@ pub(crate) proof fn lemma_vertex_ring_step(
     };
 }
 
-} // verus!
+} //  verus!

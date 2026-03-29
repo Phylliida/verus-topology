@@ -4,7 +4,7 @@ use crate::iteration::*;
 
 verus! {
 
-// --- Twin involution ---
+//  --- Twin involution ---
 
 pub open spec fn twin_involution(m: &Mesh) -> bool {
     forall|h: int|
@@ -16,7 +16,7 @@ pub open spec fn twin_involution_total(m: &Mesh) -> bool {
     index_bounds(m) && twin_involution(m)
 }
 
-// --- Prev/next bidirectional ---
+//  --- Prev/next bidirectional ---
 
 pub open spec fn next_prev_inverse_at(m: &Mesh, h: int) -> bool {
     let hcnt = half_edge_count(m);
@@ -52,7 +52,7 @@ pub open spec fn prev_next_bidirectional_total(m: &Mesh) -> bool {
     index_bounds(m) && prev_next_bidirectional(m)
 }
 
-// --- No degenerate edges ---
+//  --- No degenerate edges ---
 
 pub open spec fn no_degenerate_edges(m: &Mesh) -> bool {
     forall|h: int| 0 <= h < half_edge_count(m) ==> {
@@ -67,7 +67,7 @@ pub open spec fn no_degenerate_edges_total(m: &Mesh) -> bool {
     index_bounds(m) && no_degenerate_edges(m)
 }
 
-// --- Shared edge orientation consistency ---
+//  --- Shared edge orientation consistency ---
 
 pub open spec fn twin_faces_distinct_at(m: &Mesh, h: int) -> bool {
     let hcnt = half_edge_count(m);
@@ -115,7 +115,7 @@ pub open spec fn shared_edge_orientation_consistency_total(m: &Mesh) -> bool {
     index_bounds(m) && shared_edge_orientation_consistency(m)
 }
 
-// --- Face cycles cover ---
+//  --- Face cycles cover ---
 
 pub open spec fn face_representative_cycle_witness(m: &Mesh, f: int, k: int) -> bool {
     let hcnt = half_edge_count(m);
@@ -199,7 +199,7 @@ pub open spec fn face_has_incident_half_edge(m: &Mesh) -> bool {
         }
 }
 
-// --- Vertex manifold ---
+//  --- Vertex manifold ---
 
 pub open spec fn vertex_representative_cycle_witness(m: &Mesh, v: int, k: int) -> bool {
     let hcnt = half_edge_count(m);
@@ -248,7 +248,7 @@ pub open spec fn vertex_has_incident_half_edge(m: &Mesh) -> bool {
         }
 }
 
-// --- Edge twin duality ---
+//  --- Edge twin duality ---
 
 pub open spec fn edge_exactly_two_half_edges_at(m: &Mesh, e: int) -> bool {
     let hcnt = half_edge_count(m);
@@ -275,16 +275,16 @@ pub open spec fn edge_exactly_two_half_edges_total(m: &Mesh) -> bool {
     index_bounds(m) && edge_exactly_two_half_edges(m)
 }
 
-// --- Composite ---
+//  --- Composite ---
 
-/// 2 * edge_count == half_edge_count (each edge has exactly 2 half-edges).
-/// This is the counting consequence of edge_exactly_two_half_edges.
+///  2 * edge_count == half_edge_count (each edge has exactly 2 half-edges).
+///  This is the counting consequence of edge_exactly_two_half_edges.
 pub open spec fn half_edge_edge_count_relation(m: &Mesh) -> bool {
     2 * edge_count(m) == half_edge_count(m)
 }
 
-/// half_edge_count >= 3 * face_count (each face has at least 3 half-edges).
-/// This is the counting consequence of face cycles covering all half-edges.
+///  half_edge_count >= 3 * face_count (each face has at least 3 half-edges).
+///  This is the counting consequence of face cycles covering all half-edges.
 pub open spec fn half_edge_face_count_lower_bound(m: &Mesh) -> bool {
     half_edge_count(m) >= 3 * face_count(m)
 }
@@ -302,15 +302,15 @@ pub open spec fn structurally_valid(m: &Mesh) -> bool {
     &&& half_edge_face_count_lower_bound(m)
 }
 
-// --- Closedness ---
+//  --- Closedness ---
 
-/// A mesh is closed iff every edge has exactly two half-edges
-/// and twin half-edges belong to distinct faces.
+///  A mesh is closed iff every edge has exactly two half-edges
+///  and twin half-edges belong to distinct faces.
 pub open spec fn is_closed(m: &Mesh) -> bool {
     edge_exactly_two_half_edges(m) && twin_faces_distinct(m)
 }
 
-/// structurally_valid implies is_closed.
+///  structurally_valid implies is_closed.
 pub proof fn lemma_structurally_valid_is_closed(m: &Mesh)
     requires
         structurally_valid(m),
@@ -319,4 +319,4 @@ pub proof fn lemma_structurally_valid_is_closed(m: &Mesh)
 {
 }
 
-} // verus!
+} //  verus!
