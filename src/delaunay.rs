@@ -16,11 +16,11 @@ use crate::geometric_checkers::*;
 
 verus! {
 
-// =============================================================================
-// Find first non-Delaunay edge
-// =============================================================================
+//  =============================================================================
+//  Find first non-Delaunay edge
+//  =============================================================================
 
-/// Find the first edge that violates the Delaunay condition, or None if all pass.
+///  Find the first edge that violates the Delaunay condition, or None if all pass.
 pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Option<usize>)
     requires
         structurally_valid(m),
@@ -85,13 +85,13 @@ pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Op
     None
 }
 
-// =============================================================================
-// Single Lawson flip step
-// =============================================================================
+//  =============================================================================
+//  Single Lawson flip step
+//  =============================================================================
 
-/// Perform one step of Lawson's flip algorithm:
-/// find a non-Delaunay edge and flip it, or report the mesh is already Delaunay.
-/// Returns Ok((mesh, flipped)) where flipped indicates whether a flip was performed.
+///  Perform one step of Lawson's flip algorithm:
+///  find a non-Delaunay edge and flip it, or report the mesh is already Delaunay.
+///  Returns Ok((mesh, flipped)) where flipped indicates whether a flip was performed.
 pub fn lawson_flip_step_2d(
     mesh: Mesh,
     pos: &Vec<RuntimePoint2>,
@@ -117,7 +117,7 @@ pub fn lawson_flip_step_2d(
             proof { assert(index_bounds(&mesh)); }
             let new_mesh = flip_edge(mesh, e)?;
             proof {
-                // flip_edge_post gives us count preservation
+                //  flip_edge_post gives us count preservation
                 assert(vertex_count(&new_mesh) == vertex_count(&mesh))
                     by { /* from flip_edge_post */ };
                 assert(edge_count(&new_mesh) == edge_count(&mesh))
@@ -128,14 +128,14 @@ pub fn lawson_flip_step_2d(
     }
 }
 
-// =============================================================================
-// Lawson flip loop
-// =============================================================================
+//  =============================================================================
+//  Lawson flip loop
+//  =============================================================================
 
-/// Iteratively flip non-Delaunay edges until the mesh is locally Delaunay
-/// or max_iter iterations are exhausted.
-/// Returns Ok((mesh, converged)) where converged indicates whether
-/// the mesh is locally Delaunay.
+///  Iteratively flip non-Delaunay edges until the mesh is locally Delaunay
+///  or max_iter iterations are exhausted.
+///  Returns Ok((mesh, converged)) where converged indicates whether
+///  the mesh is locally Delaunay.
 pub fn lawson_flip_2d(
     mesh: Mesh,
     pos: &Vec<RuntimePoint2>,
@@ -169,7 +169,7 @@ pub fn lawson_flip_2d(
             }
             Ok((new_mesh, flipped)) => {
                 if !flipped {
-                    // Converged: mesh is locally Delaunay
+                    //  Converged: mesh is locally Delaunay
                     return Ok((new_mesh, true));
                 }
                 current = new_mesh;
@@ -179,8 +179,8 @@ pub fn lawson_flip_2d(
         i = i + 1;
     }
 
-    // Exhausted max_iter without converging
+    //  Exhausted max_iter without converging
     Ok((current, false))
 }
 
-} // verus!
+} //  verus!

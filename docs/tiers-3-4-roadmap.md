@@ -94,7 +94,7 @@ Follows from `lemma_subdivision_preserves_euler` already in refinement.rs.
 pub proof fn lemma_split_edge_preserves_euler_concrete(m: &Mesh, e: int)
     requires
         index_bounds(m), 0 <= e < edge_count(m),
-        // overflow guards (same as split_edge_build)
+        //  overflow guards (same as split_edge_build)
     ensures
         euler_characteristic_spec(&split_edge_build(m, e))
             == euler_characteristic_spec(m),
@@ -190,11 +190,11 @@ pub proof fn lemma_cube_is_sphere(m: &Mesh)
 pub proof fn lemma_subdivision_preserves_sphere(m: &Mesh, r: &Mesh)
     requires
         is_topological_sphere(m), all_faces_triangles(m),
-        structurally_valid(r),  // from midpoint_subdivide
+        structurally_valid(r),  //  from midpoint_subdivide
         vertex_count(r) == subdivision_vertex_count(m),
         edge_count(r) == subdivision_edge_count(m),
         face_count(r) == subdivision_face_count(m),
-        is_connected(r),  // from connectivity preservation
+        is_connected(r),  //  from connectivity preservation
     ensures is_topological_sphere(r),
 ```
 
@@ -210,7 +210,7 @@ Combines: chi preservation (already proved) + connectivity + closedness (from st
 
 ### 4b.1 Edge crossing spec
 ```rust
-/// Does the ray from p rightward cross the edge from→to?
+///  Does the ray from p rightward cross the edge from→to?
 pub open spec fn ray_crosses_edge_2d<T: OrderedField>(
     from: Point2<T>, to: Point2<T>, p: Point2<T>,
 ) -> bool
@@ -220,7 +220,7 @@ Standard ray-casting: check if p.y is between from.y and to.y, and the crossing 
 
 ### 4b.2 Winding number spec
 ```rust
-/// Sum of signed crossings of all boundary edges.
+///  Sum of signed crossings of all boundary edges.
 pub open spec fn winding_number_spec<T: OrderedField>(
     m: &Mesh, pos: Seq<Point2<T>>, p: Point2<T>,
 ) -> int
@@ -249,7 +249,7 @@ pub proof fn lemma_winding_number_parity<T: OrderedField>(
     requires
         is_topological_sphere(m),
         consistently_oriented_2d(m, pos),
-        // p not on any edge
+        //  p not on any edge
     ensures
         winding_number_spec(m, pos, p) == 0 || winding_number_spec(m, pos, p) == 1,
 ```

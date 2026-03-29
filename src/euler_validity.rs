@@ -7,21 +7,21 @@ use crate::euler_ops::{
 
 verus! {
 
-// =============================================================================
-// flip_edge preserves structural invariants
-// =============================================================================
-// Strategy: flip_edge doesn't change counts and only modifies 6 HEs.
-// The 6 modified HEs form two self-contained 3-cycles (h0→b→c and h1→d→a).
-// All other HEs are completely unchanged.
-// Key frame fact: for unmodified h, next(h) and prev(h) are also unmodified
-// (follows from prev being the inverse of next in the old mesh).
+//  =============================================================================
+//  flip_edge preserves structural invariants
+//  =============================================================================
+//  Strategy: flip_edge doesn't change counts and only modifies 6 HEs.
+//  The 6 modified HEs form two self-contained 3-cycles (h0→b→c and h1→d→a).
+//  All other HEs are completely unchanged.
+//  Key frame fact: for unmodified h, next(h) and prev(h) are also unmodified
+//  (follows from prev being the inverse of next in the old mesh).
 
-// =============================================================================
-// 1. twin_involution preserved
-// =============================================================================
+//  =============================================================================
+//  1. twin_involution preserved
+//  =============================================================================
 
-/// flip_edge preserves twin_involution.
-/// h0↔h1 twin pair is explicitly maintained. Other twins unchanged.
+///  flip_edge preserves twin_involution.
+///  h0↔h1 twin pair is explicitly maintained. Other twins unchanged.
 pub proof fn lemma_flip_edge_preserves_twin_involution(
     old_m: &Mesh, new_m: &Mesh, e: int,
 )
@@ -47,28 +47,28 @@ pub proof fn lemma_flip_edge_preserves_twin_involution(
     implies new_m.half_edges@[new_m.half_edges@[h].twin as int].twin as int == h
     by {
         if h == h0 {
-            // twin(h0) = h1, twin(h1) = h0
+            //  twin(h0) = h1, twin(h1) = h0
             assert(new_m.half_edges@[h0].twin as int == h1);
             assert(new_m.half_edges@[h1].twin as int == h0);
         } else if h == h1 {
             assert(new_m.half_edges@[h1].twin as int == h0);
             assert(new_m.half_edges@[h0].twin as int == h1);
         } else if h == a || h == b || h == c || h == d {
-            // twin(h) unchanged. Need: the HE at twin(h) also has twin unchanged.
-            // twin(h) is unchanged from old. In old mesh, twin(twin(h)) = h.
-            // If twin(h) ∉ {h0,h1,a,b,c,d}: twin field at twin(h) unchanged,
-            //   so new twin(twin(h)) = old twin(twin(h)) = h. ✓
-            // If twin(h) ∈ {a,b,c,d}: twin field preserved for a,b,c,d,
-            //   so new twin(twin(h)) = old twin(twin(h)) = h. ✓
-            // If twin(h) = h0: old twin(h0) = h1, so old twin(twin(h)) = twin(h0) = h1 = h.
-            //   But h ∈ {a,b,c,d} and h = h1? Contradicts distinctness.
-            // Similarly twin(h) ≠ h1.
+            //  twin(h) unchanged. Need: the HE at twin(h) also has twin unchanged.
+            //  twin(h) is unchanged from old. In old mesh, twin(twin(h)) = h.
+            //  If twin(h) ∉ {h0,h1,a,b,c,d}: twin field at twin(h) unchanged,
+            //    so new twin(twin(h)) = old twin(twin(h)) = h. ✓
+            //  If twin(h) ∈ {a,b,c,d}: twin field preserved for a,b,c,d,
+            //    so new twin(twin(h)) = old twin(twin(h)) = h. ✓
+            //  If twin(h) = h0: old twin(h0) = h1, so old twin(twin(h)) = twin(h0) = h1 = h.
+            //    But h ∈ {a,b,c,d} and h = h1? Contradicts distinctness.
+            //  Similarly twin(h) ≠ h1.
             let t = old_m.half_edges@[h].twin as int;
             assert(new_m.half_edges@[h].twin == old_m.half_edges@[h].twin);
             assert(old_m.half_edges@[old_m.half_edges@[h].twin as int].twin as int == h);
 
-            // Show t ≠ h0: if t = h0, then old twin(h0) = h1, and old twin(t) = old twin(h0) = h1.
-            // But old twin(twin(h)) = h, so h = h1. Contradicts h ∈ {a,b,c,d} and distinctness.
+            //  Show t ≠ h0: if t = h0, then old twin(h0) = h1, and old twin(t) = old twin(h0) = h1.
+            //  But old twin(twin(h)) = h, so h = h1. Contradicts h ∈ {a,b,c,d} and distinctness.
             if t == h0 {
                 assert(old_m.half_edges@[t].twin as int == h1);
                 assert(h == h1);
@@ -79,18 +79,18 @@ pub proof fn lemma_flip_edge_preserves_twin_involution(
                 assert(h == h0);
                 assert(false);
             }
-            // t ∉ {h0,h1}, so twin field at t is preserved in new_m
+            //  t ∉ {h0,h1}, so twin field at t is preserved in new_m
             if t == a || t == b || t == c || t == d {
                 assert(new_m.half_edges@[t].twin == old_m.half_edges@[t].twin);
             } else {
                 assert(new_m.half_edges@[t] == old_m.half_edges@[t]);
             }
         } else {
-            // h ∉ {h0,h1,a,b,c,d}: twin unchanged
+            //  h ∉ {h0,h1,a,b,c,d}: twin unchanged
             assert(new_m.half_edges@[h] == old_m.half_edges@[h]);
             let t = old_m.half_edges@[h].twin as int;
             assert(old_m.half_edges@[t].twin as int == h);
-            // Show t ∉ {h0,h1}: same argument as above
+            //  Show t ∉ {h0,h1}: same argument as above
             if t == h0 {
                 assert(old_m.half_edges@[h0].twin as int == h1);
                 assert(h == h1);
@@ -110,12 +110,12 @@ pub proof fn lemma_flip_edge_preserves_twin_involution(
     }
 }
 
-// =============================================================================
-// 2. prev_next_bidirectional preserved
-// =============================================================================
+//  =============================================================================
+//  2. prev_next_bidirectional preserved
+//  =============================================================================
 
-/// flip_edge preserves prev_next_bidirectional.
-/// New cycles: h0→b→c→h0 and h1→d→a→h1, with consistent prev pointers.
+///  flip_edge preserves prev_next_bidirectional.
+///  New cycles: h0→b→c→h0 and h1→d→a→h1, with consistent prev pointers.
 pub proof fn lemma_flip_edge_preserves_prev_next(
     old_m: &Mesh, new_m: &Mesh, e: int,
 )
@@ -124,7 +124,7 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
         flip_edge_post(old_m, new_m, e),
         0 <= e < edge_count(old_m),
         fe_all_distinct(old_m, e),
-        // Triangle conditions
+        //  Triangle conditions
         old_m.half_edges@[fe_b(old_m, e)].next as int == fe_h0(old_m, e),
         old_m.half_edges@[fe_d(old_m, e)].next as int == fe_h1(old_m, e),
     ensures
@@ -140,38 +140,38 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
 
     assert(prev_next_bidirectional(old_m));
 
-    // Prove next_prev_inverse_only: prev(next(h)) = h
+    //  Prove next_prev_inverse_only: prev(next(h)) = h
     assert forall|h: int| 0 <= h < half_edge_count(new_m)
     implies next_prev_inverse_at(new_m, h)
     by {
         if h == h0 {
-            // next(h0)=b, prev(b)=h0
+            //  next(h0)=b, prev(b)=h0
             assert(new_m.half_edges@[new_m.half_edges@[h0].next as int].prev as int == h0);
         } else if h == h1 {
             assert(new_m.half_edges@[new_m.half_edges@[h1].next as int].prev as int == h1);
         } else if h == a {
-            // next(a)=h1, prev(h1)=a
+            //  next(a)=h1, prev(h1)=a
             assert(new_m.half_edges@[new_m.half_edges@[a].next as int].prev as int == a);
         } else if h == b {
-            // next(b)=c, prev(c)=b
+            //  next(b)=c, prev(c)=b
             assert(new_m.half_edges@[new_m.half_edges@[b].next as int].prev as int == b);
         } else if h == c {
-            // next(c)=h0, prev(h0)=c
+            //  next(c)=h0, prev(h0)=c
             assert(new_m.half_edges@[new_m.half_edges@[c].next as int].prev as int == c);
         } else if h == d {
-            // next(d)=a, prev(a)=d
+            //  next(d)=a, prev(a)=d
             assert(new_m.half_edges@[new_m.half_edges@[d].next as int].prev as int == d);
         } else {
-            // Unmodified h: next(h) and prev(h) unchanged.
-            // Show next(h) ∉ {h0,h1,a,b,c,d}: prev is inverse of next in old mesh,
-            // so next(h) = x means h = prev(x). For x in modified set, prev(x) is
-            // another modified HE. Since h ∉ modified set, next(h) ∉ modified set.
+            //  Unmodified h: next(h) and prev(h) unchanged.
+            //  Show next(h) ∉ {h0,h1,a,b,c,d}: prev is inverse of next in old mesh,
+            //  so next(h) = x means h = prev(x). For x in modified set, prev(x) is
+            //  another modified HE. Since h ∉ modified set, next(h) ∉ modified set.
             assert(new_m.half_edges@[h] == old_m.half_edges@[h]);
             let nxt = old_m.half_edges@[h].next as int;
             assert(next_prev_inverse_at(old_m, h));
 
-            // nxt ∉ {h0,h1}: from triangle, prev(h0)=b, so next maps to h0 only from b.
-            // Since h ≠ b, nxt ≠ h0. Similarly nxt ≠ h1.
+            //  nxt ∉ {h0,h1}: from triangle, prev(h0)=b, so next maps to h0 only from b.
+            //  Since h ≠ b, nxt ≠ h0. Similarly nxt ≠ h1.
             if nxt == h0 {
                 assert(next_prev_inverse_at(old_m, b));
                 assert(old_m.half_edges@[old_m.half_edges@[b].next as int].prev as int == b as int);
@@ -190,7 +190,7 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
                 assert(h == d);
                 assert(false);
             }
-            // nxt ∉ {a}: old next(h0)=a, so next maps to a only from h0. h≠h0 → nxt≠a.
+            //  nxt ∉ {a}: old next(h0)=a, so next maps to a only from h0. h≠h0 → nxt≠a.
             if nxt == a {
                 assert(next_prev_inverse_at(old_m, h0));
                 assert(old_m.half_edges@[a].prev as int == h0);
@@ -223,17 +223,17 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
                 assert(h == c);
                 assert(false);
             }
-            // nxt ∉ modified set → prev(nxt) unchanged
+            //  nxt ∉ modified set → prev(nxt) unchanged
             assert(new_m.half_edges@[nxt] == old_m.half_edges@[nxt]);
         }
     }
 
-    // Prove prev_next_inverse_only: next(prev(h)) = h
+    //  Prove prev_next_inverse_only: next(prev(h)) = h
     assert forall|h: int| 0 <= h < half_edge_count(new_m)
     implies prev_next_inverse_at(new_m, h)
     by {
         if h == h0 {
-            // prev(h0)=c, next(c)=h0
+            //  prev(h0)=c, next(c)=h0
             assert(new_m.half_edges@[new_m.half_edges@[h0].prev as int].next as int == h0);
         } else if h == h1 {
             assert(new_m.half_edges@[new_m.half_edges@[h1].prev as int].next as int == h1);
@@ -250,12 +250,12 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
             let prv = old_m.half_edges@[h].prev as int;
             assert(prev_next_inverse_at(old_m, h));
 
-            // prv ∉ modified set (symmetric argument to above)
+            //  prv ∉ modified set (symmetric argument to above)
             if prv == h0 {
                 assert(prev_next_inverse_at(old_m, c));
                 assert(old_m.half_edges@[old_m.half_edges@[c].prev as int].next as int == c as int);
-                // old next(prev(c)) = c. old prev(c) = h1. old next(h1) = c.
-                // But here we need: if prv = h0, then h = old next(h0) = a.
+                //  old next(prev(c)) = c. old prev(c) = h1. old next(h1) = c.
+                //  But here we need: if prv = h0, then h = old next(h0) = a.
                 assert(prev_next_inverse_at(old_m, h));
                 assert(old_m.half_edges@[old_m.half_edges@[h].prev as int].next as int == h);
                 assert(old_m.half_edges@[h0].next as int == h);
@@ -297,9 +297,9 @@ pub proof fn lemma_flip_edge_preserves_prev_next(
     }
 }
 
-// =============================================================================
-// 3. Counting invariants (trivial — counts unchanged)
-// =============================================================================
+//  =============================================================================
+//  3. Counting invariants (trivial — counts unchanged)
+//  =============================================================================
 
 pub proof fn lemma_flip_edge_preserves_he_edge_relation(
     old_m: &Mesh, new_m: &Mesh, e: int,
@@ -321,12 +321,12 @@ pub proof fn lemma_flip_edge_preserves_he_face_bound(
         half_edge_face_count_lower_bound(new_m),
 {}
 
-// =============================================================================
-// 4. index_bounds for half_edges preserved
-// =============================================================================
+//  =============================================================================
+//  4. index_bounds for half_edges preserved
+//  =============================================================================
 
-/// flip_edge preserves the half_edges part of index_bounds:
-/// all field values in half_edges are valid indices.
+///  flip_edge preserves the half_edges part of index_bounds:
+///  all field values in half_edges are valid indices.
 pub proof fn lemma_flip_edge_preserves_he_index_bounds(
     old_m: &Mesh, new_m: &Mesh, e: int,
 )
@@ -368,10 +368,10 @@ pub proof fn lemma_flip_edge_preserves_he_index_bounds(
     }
     by {
         if h == h0 || h == h1 || h == a || h == b || h == c || h == d {
-            // All field values are existing valid indices from old mesh
-            // h0: twin=h1, next=b, prev=c, vertex=v_d, edge=edge_idx, face=f0
-            // h1: twin=h0, next=d, prev=a, vertex=v_b, edge=edge_idx, face=f1
-            // a,b,c,d: preserved fields from old mesh (valid by old index_bounds)
+            //  All field values are existing valid indices from old mesh
+            //  h0: twin=h1, next=b, prev=c, vertex=v_d, edge=edge_idx, face=f0
+            //  h1: twin=h0, next=d, prev=a, vertex=v_b, edge=edge_idx, face=f1
+            //  a,b,c,d: preserved fields from old mesh (valid by old index_bounds)
             let old_he = old_m.half_edges@[h];
             assert((old_he.twin as int) < hcnt);
             assert((old_he.next as int) < hcnt);
@@ -380,10 +380,10 @@ pub proof fn lemma_flip_edge_preserves_he_index_bounds(
             assert((old_he.edge as int) < edge_count(old_m));
             assert((old_he.face as int) < face_count(old_m));
         } else {
-            // Unmodified: all fields equal to old mesh
+            //  Unmodified: all fields equal to old mesh
             assert(new_m.half_edges@[h] == old_m.half_edges@[h]);
         }
     }
 }
 
-} // verus!
+} //  verus!

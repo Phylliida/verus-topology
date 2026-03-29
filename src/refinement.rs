@@ -7,14 +7,14 @@ use crate::checkers::*;
 
 verus! {
 
-// =============================================================================
-// Midpoint subdivision specs
-// =============================================================================
+//  =============================================================================
+//  Midpoint subdivision specs
+//  =============================================================================
 
-/// After midpoint subdivision of a triangle mesh:
-/// - V' = V + E (each edge gets a new midpoint vertex)
-/// - E' = 2E + 3F (each old edge splits in 2, each old face adds 3 internal edges)
-/// - F' = 4F (each triangle becomes 4 triangles)
+///  After midpoint subdivision of a triangle mesh:
+///  - V' = V + E (each edge gets a new midpoint vertex)
+///  - E' = 2E + 3F (each old edge splits in 2, each old face adds 3 internal edges)
+///  - F' = 4F (each triangle becomes 4 triangles)
 pub open spec fn subdivision_vertex_count(m: &Mesh) -> int {
     vertex_count(m) + edge_count(m)
 }
@@ -27,11 +27,11 @@ pub open spec fn subdivision_face_count(m: &Mesh) -> int {
     4 * face_count(m)
 }
 
-// =============================================================================
-// 6.1 midpoint_subdivide
-// =============================================================================
+//  =============================================================================
+//  6.1 midpoint_subdivide
+//  =============================================================================
 
-/// Build helper: runs the subdivision algorithm without proving postconditions.
+///  Build helper: runs the subdivision algorithm without proving postconditions.
 #[verifier::exec_allows_no_decreases_clause]
 fn midpoint_subdivide_build(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     requires
@@ -40,7 +40,7 @@ fn midpoint_subdivide_build(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     let orig_ecnt = mesh.edge_half_edges.len();
     let orig_fcnt = mesh.face_half_edges.len();
 
-    // Phase (a): Split all original edges.
+    //  Phase (a): Split all original edges.
     let mut m = mesh;
     let mut ei: usize = 0;
     while ei < orig_ecnt
@@ -63,7 +63,7 @@ fn midpoint_subdivide_build(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
         ei = ei + 2;
     }
 
-    // Phase (b): Split each original hexagonal face into 4 triangles.
+    //  Phase (b): Split each original hexagonal face into 4 triangles.
     let mut fi: usize = 0;
     while fi < orig_fcnt
         invariant
@@ -77,12 +77,12 @@ fn midpoint_subdivide_build(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     Ok(m)
 }
 
-/// Each triangle → 4 triangles via midpoint subdivision.
+///  Each triangle → 4 triangles via midpoint subdivision.
 ///
-/// Algorithm:
-/// (a) Split all E0 original edges (adding E0 new vertices).
-/// (b) For each original face (now a hexagon with 3 old + 3 new vertices
-///     alternating), call split_face 3 times to create 4 triangles.
+///  Algorithm:
+///  (a) Split all E0 original edges (adding E0 new vertices).
+///  (b) For each original face (now a hexagon with 3 old + 3 new vertices
+///      alternating), call split_face 3 times to create 4 triangles.
 pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     requires
         structurally_valid(&mesh),
@@ -99,7 +99,7 @@ pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     let orig_ecnt = mesh.edge_half_edges.len();
     let orig_fcnt = mesh.face_half_edges.len();
 
-    // Overflow guards for count comparisons
+    //  Overflow guards for count comparisons
     if orig_vcnt > usize::MAX - orig_ecnt {
         return Err(EulerError::Overflow);
     }
@@ -127,7 +127,7 @@ pub fn midpoint_subdivide(mesh: Mesh) -> (result: Result<Mesh, EulerError>)
     }
 }
 
-/// Phase 1: first diagonal split of a hexagonal face.
+///  Phase 1: first diagonal split of a hexagonal face.
 fn split_hex_first(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
     requires
         index_bounds(&mesh),
@@ -153,7 +153,7 @@ fn split_hex_first(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
     split_face(mesh, h1, h3)
 }
 
-/// Phase 2: second and third diagonal splits after the first.
+///  Phase 2: second and third diagonal splits after the first.
 fn split_hex_remaining(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
     requires
         index_bounds(&mesh),
@@ -175,10 +175,10 @@ fn split_hex_remaining(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerErro
 
     let he = mesh.half_edges[hd].next;
     if he == ha {
-        // Quad: one more split to get 2 triangles
+        //  Quad: one more split to get 2 triangles
         split_face(mesh, ha, hc)
     } else {
-        // Larger: split to reduce, then split remaining quad
+        //  Larger: split to reduce, then split remaining quad
         let mut m = split_face(mesh, hb, hd)?;
 
         let hcnt3 = m.half_edges.len();
@@ -201,7 +201,7 @@ fn split_hex_remaining(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerErro
     }
 }
 
-/// Split a hexagonal face into 4 triangles via diagonal splits.
+///  Split a hexagonal face into 4 triangles via diagonal splits.
 fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerError>)
     requires
         index_bounds(&mesh),
@@ -212,11 +212,11 @@ fn split_hexagonal_face(mesh: Mesh, fi: usize) -> (result: Result<Mesh, EulerErr
     split_hex_remaining(m, fi)
 }
 
-// =============================================================================
-// 6.2 Euler preservation lemma
-// =============================================================================
+//  =============================================================================
+//  6.2 Euler preservation lemma
+//  =============================================================================
 
-/// V'=V+E, E'=2E+3F, F'=4F → V'−E'+F' = V−E+F. Pure arithmetic proof.
+///  V'=V+E, E'=2E+3F, F'=4F → V'−E'+F' = V−E+F. Pure arithmetic proof.
 pub proof fn lemma_subdivision_preserves_euler(m: &Mesh)
     requires
         structurally_valid(m),
@@ -225,17 +225,17 @@ pub proof fn lemma_subdivision_preserves_euler(m: &Mesh)
         subdivision_vertex_count(m) - subdivision_edge_count(m) + subdivision_face_count(m)
             == euler_characteristic_spec(m),
 {
-    // V' - E' + F' = (V + E) - (2E + 3F) + 4F = V - E + F = chi
+    //  V' - E' + F' = (V + E) - (2E + 3F) + 4F = V - E + F = chi
     lemma_triangle_mesh_edge_face_relation(m);
-    // After this lemma: 2E = 3F
-    // V' - E' + F' = V + E - 2E - 3F + 4F = V - E + F
+    //  After this lemma: 2E = 3F
+    //  V' - E' + F' = V + E - 2E - 3F + 4F = V - E + F
 }
 
-// =============================================================================
-// 6.3 subdivide_n_times
-// =============================================================================
+//  =============================================================================
+//  6.3 subdivide_n_times
+//  =============================================================================
 
-/// Apply midpoint subdivision n times.
+///  Apply midpoint subdivision n times.
 #[verifier::exec_allows_no_decreases_clause]
 pub fn subdivide_n_times(mesh: Mesh, n: usize) -> (result: Result<Mesh, EulerError>)
     requires
@@ -264,4 +264,4 @@ pub fn subdivide_n_times(mesh: Mesh, n: usize) -> (result: Result<Mesh, EulerErr
     Ok(m)
 }
 
-} // verus!
+} //  verus!

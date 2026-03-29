@@ -4,18 +4,18 @@ use crate::invariants::*;
 
 verus! {
 
-// =============================================================================
-// 1. Adjacency and path specs
-// =============================================================================
+//  =============================================================================
+//  1. Adjacency and path specs
+//  =============================================================================
 
-/// Half-edge h witnesses directed edge u→v.
+///  Half-edge h witnesses directed edge u→v.
 pub open spec fn adjacent_vertices(m: &Mesh, u: int, v: int) -> bool {
     exists|h: int| 0 <= h < half_edge_count(m)
         && m.half_edges@[h].vertex as int == u
         && m.half_edges@[m.half_edges@[h].next as int].vertex as int == v
 }
 
-/// Valid vertex path: vertices in bounds, consecutive pairs adjacent.
+///  Valid vertex path: vertices in bounds, consecutive pairs adjacent.
 pub open spec fn vertex_path(m: &Mesh, path: Seq<int>) -> bool {
     &&& path.len() >= 1
     &&& forall|i: int| 0 <= i < path.len() ==> 0 <= #[trigger] path[i] < vertex_count(m)
@@ -23,22 +23,22 @@ pub open spec fn vertex_path(m: &Mesh, path: Seq<int>) -> bool {
         ==> adjacent_vertices(m, #[trigger] path[i], path[i + 1])
 }
 
-/// Exists a path from u to v.
+///  Exists a path from u to v.
 pub open spec fn vertices_reachable(m: &Mesh, u: int, v: int) -> bool {
     exists|path: Seq<int>| vertex_path(m, path) && path[0] == u && path[path.len() - 1] == v
 }
 
-/// All vertex pairs are mutually reachable.
+///  All vertex pairs are mutually reachable.
 pub open spec fn is_connected(m: &Mesh) -> bool {
     forall|u: int, v: int| 0 <= u < vertex_count(m) && 0 <= v < vertex_count(m)
         ==> vertices_reachable(m, u, v)
 }
 
-// =============================================================================
-// 2. Adjacency symmetry
-// =============================================================================
+//  =============================================================================
+//  2. Adjacency symmetry
+//  =============================================================================
 
-/// Directed edge u→v implies directed edge v→u (via twin).
+///  Directed edge u→v implies directed edge v→u (via twin).
 pub proof fn lemma_adjacent_symmetric(m: &Mesh, u: int, v: int)
     requires
         index_bounds(m),
@@ -57,11 +57,11 @@ pub proof fn lemma_adjacent_symmetric(m: &Mesh, u: int, v: int)
     assert(m.half_edges@[m.half_edges@[t].next as int].vertex as int == u);
 }
 
-// =============================================================================
-// 3. Path helpers (isolated for rlimit)
-// =============================================================================
+//  =============================================================================
+//  3. Path helpers (isolated for rlimit)
+//  =============================================================================
 
-/// A single vertex is a valid path to itself.
+///  A single vertex is a valid path to itself.
 pub proof fn lemma_trivial_path(m: &Mesh, u: int)
     requires 0 <= u < vertex_count(m),
     ensures vertices_reachable(m, u, u),
@@ -70,7 +70,7 @@ pub proof fn lemma_trivial_path(m: &Mesh, u: int)
     assert(vertex_path(m, path));
 }
 
-/// Appending w to a valid path ending at v (where v→w) gives a valid path.
+///  Appending w to a valid path ending at v (where v→w) gives a valid path.
 proof fn lemma_push_is_vertex_path(m: &Mesh, path: Seq<int>, w: int)
     requires
         vertex_path(m, path),
@@ -103,7 +103,7 @@ proof fn lemma_push_is_vertex_path(m: &Mesh, path: Seq<int>, w: int)
     }
 }
 
-/// If reachable(u, v) and v→w adjacent, then reachable(u, w).
+///  If reachable(u, v) and v→w adjacent, then reachable(u, w).
 pub proof fn lemma_extend_path(m: &Mesh, u: int, v: int, w: int)
     requires
         vertices_reachable(m, u, v),
@@ -116,16 +116,16 @@ pub proof fn lemma_extend_path(m: &Mesh, u: int, v: int, w: int)
     lemma_push_is_vertex_path(m, path, w);
 }
 
-// =============================================================================
-// 4. Reverse and concat (for full connectivity proof)
-// =============================================================================
+//  =============================================================================
+//  4. Reverse and concat (for full connectivity proof)
+//  =============================================================================
 
-/// Reverse a sequence.
+///  Reverse a sequence.
 pub open spec fn reverse_seq(s: Seq<int>) -> Seq<int> {
     Seq::new(s.len(), |i: int| s[s.len() - 1 - i])
 }
 
-/// Reversing a valid path gives a valid path (adjacency is symmetric).
+///  Reversing a valid path gives a valid path (adjacency is symmetric).
 pub proof fn lemma_reverse_path(m: &Mesh, path: Seq<int>)
     requires
         index_bounds(m),
@@ -156,7 +156,7 @@ pub proof fn lemma_reverse_path(m: &Mesh, path: Seq<int>)
     }
 }
 
-/// Concatenate two paths sharing an endpoint (drop duplicate middle vertex).
+///  Concatenate two paths sharing an endpoint (drop duplicate middle vertex).
 pub open spec fn concat_paths(p1: Seq<int>, p2: Seq<int>) -> Seq<int>
     recommends p1.len() >= 1, p2.len() >= 1,
 {
@@ -166,7 +166,7 @@ pub open spec fn concat_paths(p1: Seq<int>, p2: Seq<int>) -> Seq<int>
     )
 }
 
-/// Helper: vertices in concat_paths are all in bounds.
+///  Helper: vertices in concat_paths are all in bounds.
 pub proof fn lemma_concat_bounds(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
@@ -185,7 +185,7 @@ pub proof fn lemma_concat_bounds(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     }
 }
 
-/// Helper: consecutive pairs in concat_paths are adjacent.
+///  Helper: consecutive pairs in concat_paths are adjacent.
 pub proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
@@ -204,7 +204,7 @@ pub proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
             assert(c[i] == p1[i]);
             assert(c[i + 1] == p1[i + 1]);
         } else if i == p1.len() - 1 {
-            // Boundary: c[i] = p1[last] = p2[0], c[i+1] = p2[1]
+            //  Boundary: c[i] = p1[last] = p2[0], c[i+1] = p2[1]
             assert(c[i] == p2[0]);
             if p2.len() > 1 {
                 assert(c[i + 1] == p2[1]);
@@ -217,7 +217,7 @@ pub proof fn lemma_concat_adjacency(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     }
 }
 
-/// Concatenating two paths sharing an endpoint gives a valid path.
+///  Concatenating two paths sharing an endpoint gives a valid path.
 pub proof fn lemma_concat_paths(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     requires
         vertex_path(m, p1), vertex_path(m, p2),
@@ -233,7 +233,7 @@ pub proof fn lemma_concat_paths(m: &Mesh, p1: Seq<int>, p2: Seq<int>)
     lemma_concat_adjacency(m, p1, p2);
 }
 
-/// Transitivity: reachable(u, v) and reachable(v, w) implies reachable(u, w).
+///  Transitivity: reachable(u, v) and reachable(v, w) implies reachable(u, w).
 pub proof fn lemma_reachable_transitive(m: &Mesh, u: int, v: int, w: int)
     requires
         vertices_reachable(m, u, v),
@@ -246,11 +246,11 @@ pub proof fn lemma_reachable_transitive(m: &Mesh, u: int, v: int, w: int)
     lemma_concat_paths(m, p1, p2);
 }
 
-// =============================================================================
-// 5. Full connectivity from root reachability
-// =============================================================================
+//  =============================================================================
+//  5. Full connectivity from root reachability
+//  =============================================================================
 
-/// If reachable(0, u) and reachable(0, v), then reachable(u, v).
+///  If reachable(0, u) and reachable(0, v), then reachable(u, v).
 proof fn lemma_pair_reachable(m: &Mesh, u: int, v: int)
     requires
         index_bounds(m),
@@ -270,7 +270,7 @@ proof fn lemma_pair_reachable(m: &Mesh, u: int, v: int)
     lemma_concat_paths(m, rev, pv);
 }
 
-/// All vertices reachable from 0 implies full connectivity.
+///  All vertices reachable from 0 implies full connectivity.
 proof fn lemma_connected_from_root(m: &Mesh)
     requires
         index_bounds(m),
@@ -288,12 +288,12 @@ proof fn lemma_connected_from_root(m: &Mesh)
     }
 }
 
-// =============================================================================
-// 6. Connectivity checker (fixed-point iteration over half-edges)
-// =============================================================================
+//  =============================================================================
+//  6. Connectivity checker (fixed-point iteration over half-edges)
+//  =============================================================================
 
-/// Check connectivity via iterative edge relaxation.
-/// Repeatedly scans all half-edges, propagating reachability.
+///  Check connectivity via iterative edge relaxation.
+///  Repeatedly scans all half-edges, propagating reachability.
 pub fn check_connected(m: &Mesh) -> (out: bool)
     requires
         structurally_valid(m),
@@ -308,7 +308,7 @@ pub fn check_connected(m: &Mesh) -> (out: bool)
         return true;
     }
 
-    // Initialize visited array
+    //  Initialize visited array
     let mut visited: Vec<bool> = Vec::new();
     let mut i: usize = 0;
     while i < vcnt
@@ -325,7 +325,7 @@ pub fn check_connected(m: &Mesh) -> (out: bool)
     visited.set(0, true);
     proof { lemma_trivial_path(m, 0); }
 
-    // Fixed-point: repeat up to vcnt rounds
+    //  Fixed-point: repeat up to vcnt rounds
     let mut round: usize = 0;
     let mut changed: bool = true;
 
@@ -376,7 +376,7 @@ pub fn check_connected(m: &Mesh) -> (out: bool)
         round = round + 1;
     }
 
-    // Check all visited
+    //  Check all visited
     let mut all_visited = true;
     let mut v: usize = 0;
     while v < vcnt
@@ -408,4 +408,4 @@ pub fn check_connected(m: &Mesh) -> (out: bool)
     true
 }
 
-} // verus!
+} //  verus!

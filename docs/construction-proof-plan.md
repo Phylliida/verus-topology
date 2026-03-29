@@ -124,16 +124,16 @@ half_edge_face_count   vertex_manifold
 ## Key Ghost State Needed
 
 ```rust
-// Phase B ghost state
-ghost let face_starts: Seq<usize>;  // start HE index per face
-ghost let face_lens: Seq<usize>;    // cycle length per face
+//  Phase B ghost state
+ghost let face_starts: Seq<usize>;  //  start HE index per face
+ghost let face_lens: Seq<usize>;    //  cycle length per face
 
-// Phase C ghost state
-ghost let twin_map: Seq<usize>;     // twin assignment
+//  Phase C ghost state
+ghost let twin_map: Seq<usize>;     //  twin assignment
 
-// Phase D ghost state
-ghost let edge_pairs: Seq<(usize, usize)>;  // (h, twin(h)) per edge
+//  Phase D ghost state
+ghost let edge_pairs: Seq<(usize, usize)>;  //  (h, twin(h)) per edge
 
-// Phase E ghost state
-ghost let vertex_he: Seq<usize>;    // representative HE per vertex
+//  Phase E ghost state
+ghost let vertex_he: Seq<usize>;    //  representative HE per vertex
 ```

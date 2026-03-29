@@ -63,7 +63,7 @@ The fundamental CAD query: "is this point inside this solid?" We have all the in
 
 #### 2.1 Ray-mesh crossing spec
 ```rust
-/// Count signed crossings of a ray through all faces of a closed oriented mesh
+///  Count signed crossings of a ray through all faces of a closed oriented mesh
 pub open spec fn ray_mesh_crossing_count<T: OrderedField>(
     m: &Mesh, pos: Seq<Point3<T>>,
     ray_origin: Point3<T>, ray_dir: Vec3<T>,
@@ -76,7 +76,7 @@ Sum over all faces: +1 if ray enters the solid through this face (crosses front-
 pub open spec fn point_inside_solid<T: OrderedField>(
     m: &Mesh, pos: Seq<Point3<T>>, p: Point3<T>,
 ) -> bool {
-    // For any non-degenerate ray direction, crossing count is odd
+    //  For any non-degenerate ray direction, crossing count is odd
     exists|dir: Vec3<T>| ray_mesh_crossing_count(m, pos, p, dir) % 2 == 1
 }
 ```
@@ -91,7 +91,7 @@ pub fn check_point_inside_solid<T: OrderedField>(
         structurally_valid(m),
         is_topological_sphere(m),
         consistently_oriented_3d(m, pos_view(pos)),
-        // ray doesn't pass through any edge or vertex (non-degenerate)
+        //  ray doesn't pass through any edge or vertex (non-degenerate)
     ensures
         out ==> point_inside_solid(m, pos_view(pos), p@),
 ```
@@ -107,7 +107,7 @@ proof fn lemma_crossing_parity_consistent<T: OrderedField>(
     requires
         is_topological_sphere(m),
         consistently_oriented_3d(m, pos),
-        // both rays non-degenerate
+        //  both rays non-degenerate
     ensures
         ray_mesh_crossing_count(m, pos, p, dir1) % 2
             == ray_mesh_crossing_count(m, pos, p, dir2) % 2,
@@ -177,7 +177,7 @@ Merges two faces by removing a shared edge.
 #### 3.6 Inverse round-trip proofs
 ```rust
 proof fn lemma_kev_mev_roundtrip(m: &Mesh, v: usize, f: usize)
-    ensures kev(mev(m, v, f).0, ...) ≡ m   // modulo index renumbering
+    ensures kev(mev(m, v, f).0, ...) ≡ m   //  modulo index renumbering
 
 proof fn lemma_kef_mef_roundtrip(m: &Mesh, v1: usize, v2: usize, f: usize)
     ensures kef(mef(m, v1, v2, f).0, ...) ≡ m
@@ -203,13 +203,13 @@ Currently all meshes are closed (every half-edge has a twin, every edge borders 
 
 #### 4.1 Boundary predicates
 ```rust
-/// A half-edge is on the boundary if its twin has the sentinel "boundary face"
+///  A half-edge is on the boundary if its twin has the sentinel "boundary face"
 pub open spec fn is_boundary_half_edge(m: &Mesh, h: int) -> bool
 
-/// A vertex is on the boundary if any of its outgoing half-edges is boundary
+///  A vertex is on the boundary if any of its outgoing half-edges is boundary
 pub open spec fn is_boundary_vertex(m: &Mesh, v: int) -> bool
 
-/// An edge is on the boundary if either of its half-edges is boundary
+///  An edge is on the boundary if either of its half-edges is boundary
 pub open spec fn is_boundary_edge(m: &Mesh, e: int) -> bool
 ```
 
@@ -217,20 +217,20 @@ pub open spec fn is_boundary_edge(m: &Mesh, e: int) -> bool
 
 #### 4.2 Boundary loop traversal
 ```rust
-/// Walk along boundary half-edges: from h, follow next until back to h
+///  Walk along boundary half-edges: from h, follow next until back to h
 pub open spec fn boundary_loop(m: &Mesh, h: int) -> Seq<int>
 
-/// All boundary loops of the mesh
+///  All boundary loops of the mesh
 pub open spec fn boundary_components(m: &Mesh) -> Seq<Seq<int>>
 ```
 
 #### 4.3 Relaxed structural validity
 ```rust
 pub open spec fn structurally_valid_with_boundary(m: &Mesh) -> bool {
-    // Same as structurally_valid but:
-    // - twin can be INVALID for boundary half-edges
-    // - edges can have 1 or 2 half-edges (boundary edges have 1)
-    // - vertex manifold: boundary vertices have a fan (not a full cycle)
+    //  Same as structurally_valid but:
+    //  - twin can be INVALID for boundary half-edges
+    //  - edges can have 1 or 2 half-edges (boundary edges have 1)
+    //  - vertex manifold: boundary vertices have a fan (not a full cycle)
 }
 ```
 
@@ -271,7 +271,7 @@ In our current setup, faces are flat (positions at vertices, orientation from or
 pub trait Surface {
     spec fn contains_point(&self, p: Point3<T>) -> bool;
     spec fn normal_at(&self, p: Point3<T>) -> Vec3<T>;
-    spec fn parameter_at(&self, p: Point3<T>) -> (T, T);  // (u, v) params
+    spec fn parameter_at(&self, p: Point3<T>) -> (T, T);  //  (u, v) params
     exec fn eval(&self, u: T, v: T) -> Point3<T>;
 }
 ```
@@ -293,10 +293,10 @@ Implementors: Line, Arc, Conic, BSplineCurve.
 #### 5.3 BREP structure
 ```rust
 pub struct BrepFace {
-    pub topology: FaceId,           // link to half-edge mesh
-    pub surface: Box<dyn Surface>,  // geometric backing
+    pub topology: FaceId,           //  link to half-edge mesh
+    pub surface: Box<dyn Surface>,  //  geometric backing
     pub outer_loop: LoopId,
-    pub inner_loops: Vec<LoopId>,   // holes
+    pub inner_loops: Vec<LoopId>,   //  holes
 }
 
 pub struct BrepEdge {
@@ -309,13 +309,13 @@ pub struct BrepEdge {
 
 #### 5.4 Geometric consistency specs
 ```rust
-/// Every vertex position lies on all its adjacent surfaces
+///  Every vertex position lies on all its adjacent surfaces
 spec fn vertex_surface_consistency(brep: &Brep) -> bool
 
-/// Every edge curve lies on both adjacent surfaces
+///  Every edge curve lies on both adjacent surfaces
 spec fn edge_surface_consistency(brep: &Brep) -> bool
 
-/// Face surface normal agrees with topological orientation
+///  Face surface normal agrees with topological orientation
 spec fn orientation_consistency(brep: &Brep) -> bool
 ```
 
@@ -346,7 +346,7 @@ Union, intersection, and difference of solids. This is what makes a CAD kernel a
 
 #### 6.1 Intersection detection
 ```rust
-/// Find all pairs of faces from mesh A and mesh B that intersect
+///  Find all pairs of faces from mesh A and mesh B that intersect
 fn find_intersecting_face_pairs(
     a: &Mesh, pos_a: &[Point3<T>],
     b: &Mesh, pos_b: &[Point3<T>],
@@ -356,7 +356,7 @@ Accelerated by AABB trees (verus-geometry has `aabb3_separated`).
 
 #### 6.2 Intersection computation
 ```rust
-/// Compute the intersection curve of two triangles
+///  Compute the intersection curve of two triangles
 fn triangle_triangle_intersection(
     a: &Triangle3<T>, b: &Triangle3<T>,
 ) -> Option<Segment3<T>>
@@ -365,17 +365,17 @@ verus-geometry has `segment_triangle_intersects_strict` — needs extension to c
 
 #### 6.3 Point classification
 ```rust
-/// Classify each face of mesh A as inside, outside, or on the boundary of mesh B
+///  Classify each face of mesh A as inside, outside, or on the boundary of mesh B
 fn classify_faces(
     a: &Mesh, pos_a: &[Point3<T>],
     b: &Mesh, pos_b: &[Point3<T>],
-) -> Vec<Classification>  // Inside, Outside, OnBoundary
+) -> Vec<Classification>  //  Inside, Outside, OnBoundary
 ```
 Uses point-in-solid (§2) as the core query.
 
 #### 6.4 Topology reconstruction
 ```rust
-/// Build the result mesh from classified faces
+///  Build the result mesh from classified faces
 fn boolean_union(a: &Mesh, b: &Mesh, ...) -> Mesh
     ensures structurally_valid(&result) && is_topological_sphere(&result)
 
@@ -412,13 +412,13 @@ verus-geometry has `incircle2d` with full permutation/sign/trichotomy lemmas. Th
 
 #### 7.2 Lawson flip algorithm
 ```rust
-/// Flip edges until the Delaunay criterion holds everywhere
+///  Flip edges until the Delaunay criterion holds everywhere
 fn lawson_flip(m: &mut Mesh, pos: &[Point2<T>])
     requires structurally_valid(m), all_faces_triangles(m),
     ensures
         structurally_valid(m),
         all_faces_triangles(m),
-        is_delaunay(m, pos),  // no illegal edges
+        is_delaunay(m, pos),  //  no illegal edges
 ```
 
 **Algorithm:** Maintain a stack of edges to check. For each edge, if the incircle test fails (the opposite vertex of one triangle is inside the circumcircle of the other), flip the edge. Repeat until stack is empty.
@@ -427,7 +427,7 @@ Uses: `flip_edge` (already in euler_ops.rs), `incircle2d_sign_exec` (already in 
 
 #### 7.3 Incremental insertion
 ```rust
-/// Insert a point into a Delaunay triangulation
+///  Insert a point into a Delaunay triangulation
 fn insert_point(m: &mut Mesh, pos: &mut Vec<Point2<T>>, p: Point2<T>)
     requires structurally_valid(m), is_delaunay(m, pos),
     ensures structurally_valid(m), is_delaunay(m, pos),
@@ -439,8 +439,8 @@ fn insert_point(m: &mut Mesh, pos: &mut Vec<Point2<T>>, p: Point2<T>)
 ```rust
 pub open spec fn is_delaunay<T: OrderedField>(m: &Mesh, pos: Seq<Point2<T>>) -> bool {
     forall|e: int| 0 <= e < edge_count(m) ==> {
-        // For each interior edge, the opposite vertex of each adjacent triangle
-        // is NOT inside the circumcircle of the other triangle
+        //  For each interior edge, the opposite vertex of each adjacent triangle
+        //  is NOT inside the circumcircle of the other triangle
         !incircle2d_positive(/* triangle vertices */, /* opposite vertex */)
     }
 }

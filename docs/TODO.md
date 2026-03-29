@@ -78,9 +78,9 @@ pub struct HalfEdge {
     pub twin: HalfEdgeId,
     pub next: HalfEdgeId,
     pub prev: HalfEdgeId,
-    pub vertex: VertexId,    // origin vertex
-    pub edge: EdgeId,        // parent undirected edge
-    pub face: FaceId,        // incident face
+    pub vertex: VertexId,    //  origin vertex
+    pub edge: EdgeId,        //  parent undirected edge
+    pub face: FaceId,        //  incident face
 }
 ```
 
@@ -91,15 +91,15 @@ pub struct HalfEdge {
 
 ```
 pub struct Vertex {
-    pub half_edge: HalfEdgeId,   // one outgoing half-edge
+    pub half_edge: HalfEdgeId,   //  one outgoing half-edge
 }
 
 pub struct Edge {
-    pub half_edge: HalfEdgeId,   // one of the two half-edges
+    pub half_edge: HalfEdgeId,   //  one of the two half-edges
 }
 
 pub struct Face {
-    pub half_edge: HalfEdgeId,   // one half-edge in the face cycle
+    pub half_edge: HalfEdgeId,   //  one half-edge in the face cycle
 }
 ```
 
@@ -146,7 +146,7 @@ spec fn index_bounds_spec(m: &MeshModel) -> bool {
         m.half_edges[h].edge < m.edge_count &&
         m.half_edges[h].face < m.face_count
     }
-    // ... plus vertex/edge/face representative refs in bounds
+    //  ... plus vertex/edge/face representative refs in bounds
 }
 ```
 
@@ -349,7 +349,7 @@ The degenerate "point shell."
 
 ```
 fn mvfs(mesh: &mut Mesh, /* vertex data */) -> (VertexId, FaceId)
-    ensures mesh@.valid_spec()  // if it held before
+    ensures mesh@.valid_spec()  //  if it held before
 ```
 
 - [ ] Implement
