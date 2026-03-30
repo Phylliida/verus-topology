@@ -7,7 +7,7 @@ use verus_geometry::incircle::*;
 use verus_geometry::delaunay::*;
 use verus_geometry::runtime::point2::RuntimePoint2;
 use verus_geometry::runtime::classification::incircle2d_sign_exec;
-use verus_geometry::runtime::RationalModel;
+
 use crate::mesh::*;
 use crate::invariants::*;
 use crate::euler_ops::*;
@@ -27,9 +27,9 @@ pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Op
         pos@.len() == vertex_count(m),
         positions_wf_2d(pos),
     ensures
-        out is None ==> is_locally_delaunay_mesh_2d::<RationalModel>(m, pos_view_2d(pos)),
+        out is None ==> is_locally_delaunay_mesh_2d::<V>(m, pos_view_2d(pos)),
         out is Some ==> 0 <= out->Some_0 < edge_count(m) as int,
-        out is Some ==> !edge_delaunay_2d::<RationalModel>(m, pos_view_2d(pos), out->Some_0 as int),
+        out is Some ==> !edge_delaunay_2d::<V>(m, pos_view_2d(pos), out->Some_0 as int),
 {
     proof { assert(index_bounds(m)); }
     let ecnt = m.edge_half_edges.len();
@@ -43,7 +43,7 @@ pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Op
             0 <= e <= ecnt,
             ecnt == edge_count(m),
             forall|ee: int| 0 <= ee < e as int
-                ==> edge_delaunay_2d::<RationalModel>(m, pos_view_2d(pos), ee),
+                ==> edge_delaunay_2d::<V>(m, pos_view_2d(pos), ee),
         decreases ecnt - e,
     {
         let h = m.edge_half_edges[e];
@@ -106,7 +106,7 @@ pub fn lawson_flip_step_2d(
         result is Ok ==> edge_count(&result->Ok_0.0) == edge_count(&mesh),
         result is Ok ==> pos@.len() == vertex_count(&result->Ok_0.0),
         result is Ok ==> !result->Ok_0.1
-            ==> is_locally_delaunay_mesh_2d::<RationalModel>(&result->Ok_0.0, pos_view_2d(pos)),
+            ==> is_locally_delaunay_mesh_2d::<V>(&result->Ok_0.0, pos_view_2d(pos)),
 {
     let found = find_non_delaunay_edge_2d(&mesh, pos);
     match found {
@@ -149,7 +149,7 @@ pub fn lawson_flip_2d(
         result is Ok ==> structurally_valid(&result->Ok_0.0),
         result is Ok ==> pos@.len() == vertex_count(&result->Ok_0.0),
         result is Ok && result->Ok_0.1
-            ==> is_locally_delaunay_mesh_2d::<RationalModel>(&result->Ok_0.0, pos_view_2d(pos)),
+            ==> is_locally_delaunay_mesh_2d::<V>(&result->Ok_0.0, pos_view_2d(pos)),
 {
     let mut current = mesh;
     let mut i: usize = 0;

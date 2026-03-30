@@ -1,15 +1,17 @@
 use vstd::prelude::*;
 use verus_algebra::traits::*;
+use verus_algebra::traits::field::OrderedField;
+use verus_algebra::traits::runtime::*;
 use verus_linalg::vec3::Vec3;
 use verus_linalg::vec3::ops::*;
 use verus_geometry::point3::Point3;
 use verus_geometry::point3::sub3;
 use verus_geometry::ray_triangle::*;
-use verus_geometry::runtime::point3::{RuntimePoint3, sub3_exec, cross_exec, dot3_exec};
+use verus_geometry::runtime::point3::RuntimePoint3;
 use verus_geometry::runtime::ray_triangle::ray_hits_triangle_nodiv_exec;
-use verus_geometry::runtime::RationalModel;
-use verus_linalg::runtime::vec3::RuntimeVec3;
-use verus_rational::runtime_rational::RuntimeRational;
+
+
+
 use crate::mesh::*;
 use crate::invariants::*;
 use crate::queries::*;
@@ -160,9 +162,9 @@ proof fn lemma_prefix_nonneg<T: OrderedRing>(
 
 ///  Bridge: ray_hits_triangle_nodiv_exec result matches ray_hits_face spec.
 proof fn lemma_ray_hits_face_bridge(
-    m: &Mesh, pos: &Vec<RuntimePoint3>,
+    m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
     f: int,
-    origin: &RuntimePoint3, dir: &RuntimeVec3,
+    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
     v0: int, v1: int, v2: int,
     exec_result: bool,
 )
@@ -179,18 +181,18 @@ proof fn lemma_ray_hits_face_bridge(
         m.half_edges@[m.face_half_edges@[f] as int].vertex as int == v0,
         m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].vertex as int == v1,
         m.half_edges@[m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].next as int].vertex as int == v2,
-        exec_result == ray_hits_triangle_nodiv::<RationalModel>(
-            origin@, dir@, pos@[v0]@, pos@[v1]@, pos@[v2]@,
+        exec_result == ray_hits_triangle_nodiv::<V>(
+            origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@,
         ),
     ensures
-        exec_result == ray_hits_face::<RationalModel>(
-            m, pos_view_3d(pos), f, origin@, dir@,
+        exec_result == ray_hits_face::<V>(
+            m, pos_view_3d(pos), f, origin.model@, dir.model@,
         ),
 {
     let pv = pos_view_3d(pos);
-    assert(pv[v0] == pos@[v0]@);
-    assert(pv[v1] == pos@[v1]@);
-    assert(pv[v2] == pos@[v2]@);
+    assert(pv[v0] == pos@[v0].model@);
+    assert(pv[v1] == pos@[v1].model@);
+    assert(pv[v2] == pos@[v2].model@);
 }
 
 //  =============================================================================
@@ -198,9 +200,9 @@ proof fn lemma_ray_hits_face_bridge(
 //  =============================================================================
 
 ///  Count the number of mesh faces hit by a ray (runtime).
-pub fn ray_crossing_count_exec(
-    m: &Mesh, pos: &Vec<RuntimePoint3>,
-    origin: &RuntimePoint3, dir: &RuntimeVec3,
+pub fn ray_crossing_count_exec<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
+    m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
+    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (count: usize)
     requires
         structurally_valid(m),
@@ -212,8 +214,8 @@ pub fn ray_crossing_count_exec(
         //  Overflow guard: face count fits in usize
         face_count(m) < usize::MAX,
     ensures
-        count as int == ray_crossing_count::<RationalModel>(
-            m, pos_view_3d(pos), origin@, dir@,
+        count as int == ray_crossing_count::<V>(
+            m, pos_view_3d(pos), origin.model@, dir.model@,
         ),
 {
     proof { assert(index_bounds(m)); }
@@ -232,8 +234,8 @@ pub fn ray_crossing_count_exec(
             0 <= f <= fcnt,
             fcnt == face_count(m),
             fcnt < usize::MAX,
-            count as int == ray_crossing_count_prefix::<RationalModel>(
-                m, pos_view_3d(pos), origin@, dir@, f as int,
+            count as int == ray_crossing_count_prefix::<V>(
+                m, pos_view_3d(pos), origin.model@, dir.model@, f as int,
             ),
             count <= f,
         decreases fcnt - f,
@@ -251,8 +253,8 @@ pub fn ray_crossing_count_exec(
             lemma_ray_hits_face_bridge(
                 m, pos, f as int, origin, dir,
                 v0 as int, v1 as int, v2 as int, hit);
-            lemma_prefix_unfold::<RationalModel>(
-                m, pos_view_3d(pos), origin@, dir@, (f + 1) as int);
+            lemma_prefix_unfold::<V>(
+                m, pos_view_3d(pos), origin.model@, dir.model@, (f + 1) as int);
         }
 
         if hit {
@@ -273,9 +275,9 @@ pub fn ray_crossing_count_exec(
 ///  The caller must ensure the ray is in "general position" — it should not
 ///  pass through any edge or vertex of the mesh. With exact rational arithmetic,
 ///  this can be checked or guaranteed by perturbation.
-pub fn check_point_in_solid(
-    m: &Mesh, pos: &Vec<RuntimePoint3>,
-    origin: &RuntimePoint3, dir: &RuntimeVec3,
+pub fn check_point_in_solid<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
+    m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
+    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (out: bool)
     requires
         structurally_valid(m),
@@ -286,8 +288,8 @@ pub fn check_point_in_solid(
         dir.wf_spec(),
         face_count(m) < usize::MAX,
     ensures
-        out == point_in_solid::<RationalModel>(
-            m, pos_view_3d(pos), origin@, dir@,
+        out == point_in_solid::<V>(
+            m, pos_view_3d(pos), origin.model@, dir.model@,
         ),
 {
     let count = ray_crossing_count_exec(m, pos, origin, dir);
@@ -401,8 +403,8 @@ pub open spec fn ray_general_position<T: OrderedRing>(
 
 ///  Bridge: exec computation of Moller-Trumbore parameters matches face-level specs.
 proof fn lemma_ray_face_params_bridge(
-    m: &Mesh, pos: &Vec<RuntimePoint3>,
-    f: int, origin: &RuntimePoint3, dir: &RuntimeVec3,
+    m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
+    f: int, origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
     v0: int, v1: int, v2: int,
     det_exec: &RuntimeRational, u_exec: &RuntimeRational,
     v_exec: &RuntimeRational, t_exec: &RuntimeRational,
@@ -420,20 +422,20 @@ proof fn lemma_ray_face_params_bridge(
         m.half_edges@[m.face_half_edges@[f] as int].vertex as int == v0,
         m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].vertex as int == v1,
         m.half_edges@[m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].next as int].vertex as int == v2,
-        det_exec@ == ray_tri_det::<RationalModel>(dir@, pos@[v0]@, pos@[v1]@, pos@[v2]@),
-        u_exec@ == ray_tri_u_unnorm::<RationalModel>(origin@, dir@, pos@[v0]@, pos@[v1]@, pos@[v2]@),
-        v_exec@ == ray_tri_v_unnorm::<RationalModel>(origin@, dir@, pos@[v0]@, pos@[v1]@, pos@[v2]@),
-        t_exec@ == ray_tri_t_unnorm::<RationalModel>(origin@, dir@, pos@[v0]@, pos@[v1]@, pos@[v2]@),
+        det_exec@ == ray_tri_det::<V>(dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        u_exec@ == ray_tri_u_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        v_exec@ == ray_tri_v_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        t_exec@ == ray_tri_t_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
     ensures
-        det_exec@ == ray_face_det::<RationalModel>(m, pos_view_3d(pos), f, dir@),
-        u_exec@ == ray_face_u::<RationalModel>(m, pos_view_3d(pos), f, origin@, dir@),
-        v_exec@ == ray_face_v::<RationalModel>(m, pos_view_3d(pos), f, origin@, dir@),
-        t_exec@ == ray_face_t::<RationalModel>(m, pos_view_3d(pos), f, origin@, dir@),
+        det_exec@ == ray_face_det::<V>(m, pos_view_3d(pos), f, dir.model@),
+        u_exec@ == ray_face_u::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
+        v_exec@ == ray_face_v::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
+        t_exec@ == ray_face_t::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
 {
     let pv = pos_view_3d(pos);
-    assert(pv[v0] == pos@[v0]@);
-    assert(pv[v1] == pos@[v1]@);
-    assert(pv[v2] == pos@[v2]@);
+    assert(pv[v0] == pos@[v0].model@);
+    assert(pv[v1] == pos@[v1].model@);
+    assert(pv[v2] == pos@[v2].model@);
 }
 
 ///  Check that the ray is in general position w.r.t. all mesh faces.
@@ -441,9 +443,9 @@ proof fn lemma_ray_face_params_bridge(
 ///  For each face, computes the Moller-Trumbore determinant, barycentric
 ///  coordinates (u, v), and ray parameter (t). Returns false if any face
 ///  has a boundary hit (any of det, u, v, det-u-v, or t is zero).
-pub fn check_ray_general_position(
-    m: &Mesh, pos: &Vec<RuntimePoint3>,
-    origin: &RuntimePoint3, dir: &RuntimeVec3,
+pub fn check_ray_general_position<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
+    m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
+    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (out: bool)
     requires
         structurally_valid(m),
@@ -453,14 +455,14 @@ pub fn check_ray_general_position(
         origin.wf_spec(),
         dir.wf_spec(),
     ensures
-        out ==> ray_general_position::<RationalModel>(
-            m, pos_view_3d(pos), origin@, dir@,
+        out ==> ray_general_position::<V>(
+            m, pos_view_3d(pos), origin.model@, dir.model@,
         ),
 {
     proof { assert(index_bounds(m)); }
     let fcnt = m.face_half_edges.len();
     let mut f: usize = 0;
-    let zero = RuntimeRational::from_int(0);
+    let zero = origin.x.zero_like();
 
     while f < fcnt
         invariant
@@ -471,12 +473,12 @@ pub fn check_ray_general_position(
             origin.wf_spec(),
             dir.wf_spec(),
             zero.wf_spec(),
-            zero@ == RationalModel::from_int_spec(0),
+            zero.model() == V::from_int_spec(0),
             0 <= f <= fcnt,
             fcnt == face_count(m),
             forall|ff: int| 0 <= ff < f as int ==>
-                ray_face_general_position::<RationalModel>(
-                    m, pos_view_3d(pos), ff, origin@, dir@),
+                ray_face_general_position::<V>(
+                    m, pos_view_3d(pos), ff, origin.model@, dir.model@),
         decreases fcnt - f,
     {
         let h0 = m.face_half_edges[f];
@@ -487,31 +489,31 @@ pub fn check_ray_general_position(
         let vi2 = m.half_edges[h2].vertex;
 
         //  Compute Moller-Trumbore parameters
-        let e1 = sub3_exec(&pos[vi1], &pos[vi0]);
-        let e2 = sub3_exec(&pos[vi2], &pos[vi0]);
-        let p = cross_exec(dir, &e2);
-        let det = dot3_exec(&e1, &p);
+        let e1 = pos[vi1].sub(&pos[vi0]);
+        let e2 = pos[vi2].sub(&pos[vi0]);
+        let p = dir.cross(&e2);
+        let det = e1.dot(&p);
 
         if det.eq(&zero) {
             //  Ray parallel to face — automatic miss, general position OK
             proof {
-                assert(det@.eqv_spec(zero@));
-                assert(det@ == ray_tri_det::<RationalModel>(
-                    dir@, pos@[vi0 as int]@, pos@[vi1 as int]@, pos@[vi2 as int]@));
+                assert(det.model().eqv_spec(zero.model()));
+                assert(det.model() == ray_tri_det::<V>(
+                    dir.model@, pos@[vi0 as int].model@, pos@[vi1 as int].model@, pos@[vi2 as int].model@));
                 let pv = pos_view_3d(pos);
-                assert(pv[vi0 as int] == pos@[vi0 as int]@);
-                assert(pv[vi1 as int] == pos@[vi1 as int]@);
-                assert(pv[vi2 as int] == pos@[vi2 as int]@);
+                assert(pv[vi0 as int] == pos@[vi0 as int].model@);
+                assert(pv[vi1 as int] == pos@[vi1 as int].model@);
+                assert(pv[vi2 as int] == pos@[vi2 as int].model@);
             }
             f = f + 1;
             continue;
         }
 
-        let tvec = sub3_exec(origin, &pos[vi0]);
-        let u = dot3_exec(&tvec, &p);
-        let q = cross_exec(&tvec, &e1);
-        let v = dot3_exec(dir, &q);
-        let t = dot3_exec(&e2, &q);
+        let tvec = origin.sub(&pos[vi0]);
+        let u = tvec.dot(&p);
+        let q = tvec.cross(&e1);
+        let v = dir.dot(&q);
+        let t = e2.dot(&q);
         let uv = u.add(&v);
         let det_minus_uv = det.sub(&uv);
 
