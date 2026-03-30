@@ -6,6 +6,8 @@ use verus_geometry::orientation_sign::*;
 use verus_geometry::incircle::*;
 use verus_geometry::delaunay::*;
 use verus_geometry::runtime::point2::RuntimePoint2;
+use verus_algebra::traits::field::OrderedField;
+use verus_algebra::traits::runtime::*;
 use verus_geometry::runtime::classification::incircle2d_sign_exec;
 
 use crate::mesh::*;
@@ -21,7 +23,7 @@ verus! {
 //  =============================================================================
 
 ///  Find the first edge that violates the Delaunay condition, or None if all pass.
-pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Option<usize>)
+pub fn find_non_delaunay_edge_2d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(m: &Mesh, pos: &Vec<RuntimePoint2<R, V>>) -> (out: Option<usize>)
     requires
         structurally_valid(m),
         pos@.len() == vertex_count(m),
@@ -92,9 +94,9 @@ pub fn find_non_delaunay_edge_2d(m: &Mesh, pos: &Vec<RuntimePoint2>) -> (out: Op
 ///  Perform one step of Lawson's flip algorithm:
 ///  find a non-Delaunay edge and flip it, or report the mesh is already Delaunay.
 ///  Returns Ok((mesh, flipped)) where flipped indicates whether a flip was performed.
-pub fn lawson_flip_step_2d(
+pub fn lawson_flip_step_2d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     mesh: Mesh,
-    pos: &Vec<RuntimePoint2>,
+    pos: &Vec<RuntimePoint2<R, V>>,
 ) -> (result: Result<(Mesh, bool), EulerError>)
     requires
         structurally_valid(&mesh),
@@ -136,9 +138,9 @@ pub fn lawson_flip_step_2d(
 ///  or max_iter iterations are exhausted.
 ///  Returns Ok((mesh, converged)) where converged indicates whether
 ///  the mesh is locally Delaunay.
-pub fn lawson_flip_2d(
+pub fn lawson_flip_2d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     mesh: Mesh,
-    pos: &Vec<RuntimePoint2>,
+    pos: &Vec<RuntimePoint2<R, V>>,
     max_iter: usize,
 ) -> (result: Result<(Mesh, bool), EulerError>)
     requires

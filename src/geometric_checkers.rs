@@ -53,7 +53,7 @@ pub open spec fn positions_wf_3d<R: RuntimeRingOps<V>, V: OrderedField>(pos: &Ve
 //  =============================================================================
 
 ///  Bridge: orient2d_sign_exec result == Positive implies face_oriented_ccw_2d.
-proof fn lemma_orient2d_positive_implies_face_ccw(
+proof fn lemma_orient2d_positive_implies_face_ccw<R: RuntimeRingOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint2<R, V>>,
     f: int, v0: int, v1: int, v2: int,
 )
@@ -79,7 +79,7 @@ proof fn lemma_orient2d_positive_implies_face_ccw(
 }
 
 ///  Bridge: orient3d_sign_exec result == Negative implies face_outward_normal_3d.
-proof fn lemma_orient3d_negative_implies_face_outward(
+proof fn lemma_orient3d_negative_implies_face_outward<R: RuntimeRingOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
     f: int, v0: int, v1: int, v2: int,
     interior: Point3<V>,
@@ -222,7 +222,7 @@ pub fn check_consistently_oriented_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
 //  =============================================================================
 
 ///  Bridge: incircle2d_sign_exec result != Positive implies edge_delaunay_2d.
-pub proof fn lemma_incircle_not_positive_implies_edge_delaunay(
+pub proof fn lemma_incircle_not_positive_implies_edge_delaunay<R: RuntimeRingOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint2<R, V>>,
     e: int,
     va: int, vb: int, vc: int, vd: int,
@@ -258,7 +258,7 @@ pub proof fn lemma_incircle_not_positive_implies_edge_delaunay(
 
 ///  Bridge: incircle2d_sign_exec result == Positive implies NOT edge_delaunay_2d.
 ///  Converse of lemma_incircle_not_positive_implies_edge_delaunay.
-pub proof fn lemma_incircle_positive_implies_not_edge_delaunay(
+pub proof fn lemma_incircle_positive_implies_not_edge_delaunay<R: RuntimeRingOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint2<R, V>>,
     e: int,
     va: int, vb: int, vc: int, vd: int,
@@ -365,7 +365,7 @@ pub fn check_locally_delaunay_mesh_2d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
 //  =============================================================================
 
 ///  Bridge: orient3d_sign_exec result != Positive for one point.
-proof fn lemma_orient3d_not_positive_for_point(
+proof fn lemma_orient3d_not_positive_for_point<R: RuntimeRingOps<V>, V: OrderedField>(
     points: &Vec<RuntimePoint3<R, V>>,
     a: Point3<V>,
     b: Point3<V>,
@@ -375,10 +375,10 @@ proof fn lemma_orient3d_not_positive_for_point(
     requires
         0 <= pi < points@.len(),
         points@[pi].wf_spec(),
-        orient3d_sign::<V>(a, b, c, points@[pi]@)
+        orient3d_sign::<V>(a, b, c, points@[pi].model@)
             != OrientationSign::Positive,
     ensures
-        !orient3d_positive::<V>(a, b, c, points@[pi]@),
+        !orient3d_positive::<V>(a, b, c, points@[pi].model@),
 {
 }
 
@@ -401,7 +401,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
         forall|i: int| 0 <= i < points@.len() ==> (#[trigger] points@[i]).wf_spec(),
     ensures
         out ==> all_points_on_or_below_plane::<V>(
-            Seq::new(points@.len(), |i: int| points@[i]@), a@, b@, c@,
+            Seq::new(points@.len(), |i: int| points@[i].model@), a@, b@, c@,
         ),
 {
     let pcnt = points.len();
@@ -416,7 +416,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
             pcnt == points@.len(),
             forall|j: int| 0 <= j < points@.len() ==> (#[trigger] points@[j]).wf_spec(),
             forall|j: int| 0 <= j < i as int ==>
-                !orient3d_positive::<V>(a@, b@, c@, points@[j]@),
+                !orient3d_positive::<V>(a@, b@, c@, points@[j].model@),
         decreases pcnt - i,
     {
         let sign = orient3d_sign_exec(a, b, c, &points[i]);
@@ -439,11 +439,11 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
 
     //  Bridge from per-point fact to Seq-based spec
     proof {
-        let pt_views = Seq::new(points@.len(), |i: int| points@[i]@);
+        let pt_views = Seq::new(points@.len(), |i: int| points@[i].model@);
         assert forall|j: int| 0 <= j < pt_views.len() implies
             !orient3d_positive::<V>(a@, b@, c@, #[trigger] pt_views[j])
         by {
-            assert(pt_views[j] == points@[j]@);
+            assert(pt_views[j] == points@[j].model@);
         }
     }
 
@@ -464,7 +464,7 @@ pub fn check_convex_hull_mesh_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
         forall|i: int| 0 <= i < points@.len() ==> (#[trigger] points@[i]).wf_spec(),
     ensures
         out ==> is_convex_hull_mesh_3d::<V>(m, pos_view_3d(pos),
-            Seq::new(points@.len(), |i: int| points@[i]@)),
+            Seq::new(points@.len(), |i: int| points@[i].model@)),
 {
     proof { assert(index_bounds(m)); }
     let fcnt = m.face_half_edges.len();
@@ -489,7 +489,7 @@ pub fn check_convex_hull_mesh_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
                 let b = pv[m.half_edges@[h1].vertex as int];
                 let c = pv[m.half_edges@[h2].vertex as int];
                 all_points_on_or_below_plane::<V>(
-                    Seq::new(points@.len(), |i: int| points@[i]@), a, b, c,
+                    Seq::new(points@.len(), |i: int| points@[i].model@), a, b, c,
                 )
             },
         decreases fcnt - f,
