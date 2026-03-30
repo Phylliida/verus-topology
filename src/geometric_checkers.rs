@@ -166,7 +166,7 @@ pub fn check_consistently_oriented_2d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
 pub fn check_consistently_oriented_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh,
     pos: &Vec<RuntimePoint3<R, V>>,
-    interior: &RuntimePoint3,
+    interior: &RuntimePoint3<R, V>,
 ) -> (out: bool)
     requires
         structurally_valid(m),
@@ -174,7 +174,7 @@ pub fn check_consistently_oriented_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
         positions_wf_3d(pos),
         interior.wf_spec(),
     ensures
-        out ==> consistently_oriented_3d::<V>(m, pos_view_3d(pos), interior@),
+        out ==> consistently_oriented_3d::<V>(m, pos_view_3d(pos), interior.model@),
 {
     proof { assert(index_bounds(m)); }
     let fcnt = m.face_half_edges.len();
@@ -189,7 +189,7 @@ pub fn check_consistently_oriented_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
             0 <= f <= fcnt,
             fcnt == face_count(m),
             forall|ff: int| 0 <= ff < f as int
-                ==> face_outward_normal_3d::<V>(m, pos_view_3d(pos), ff, interior@),
+                ==> face_outward_normal_3d::<V>(m, pos_view_3d(pos), ff, interior.model@),
         decreases fcnt - f,
     {
         let h0 = m.face_half_edges[f];
@@ -205,7 +205,7 @@ pub fn check_consistently_oriented_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedFi
             OrientationSign::Negative => {
                 proof {
                     lemma_orient3d_negative_implies_face_outward(
-                        m, pos, f as int, v0 as int, v1 as int, v2 as int, interior@);
+                        m, pos, f as int, v0 as int, v1 as int, v2 as int, interior.model@);
                 }
             }
             _ => { return false; }
@@ -389,9 +389,9 @@ proof fn lemma_orient3d_not_positive_for_point<R: RuntimeRingOps<V>, V: OrderedF
 ///  Check that a single face (a, b, c) is a hull face: all points are on the
 ///  non-positive side.
 pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
-    a: &RuntimePoint3,
-    b: &RuntimePoint3,
-    c: &RuntimePoint3,
+    a: &RuntimePoint3<R, V>,
+    b: &RuntimePoint3<R, V>,
+    c: &RuntimePoint3<R, V>,
     points: &Vec<RuntimePoint3<R, V>>,
 ) -> (out: bool)
     requires
@@ -401,7 +401,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
         forall|i: int| 0 <= i < points@.len() ==> (#[trigger] points@[i]).wf_spec(),
     ensures
         out ==> all_points_on_or_below_plane::<V>(
-            Seq::new(points@.len(), |i: int| points@[i].model@), a@, b@, c@,
+            Seq::new(points@.len(), |i: int| points@[i].model@), a.model@, b.model@, c.model@,
         ),
 {
     let pcnt = points.len();
@@ -416,7 +416,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
             pcnt == points@.len(),
             forall|j: int| 0 <= j < points@.len() ==> (#[trigger] points@[j]).wf_spec(),
             forall|j: int| 0 <= j < i as int ==>
-                !orient3d_positive::<V>(a@, b@, c@, points@[j].model@),
+                !orient3d_positive::<V>(a.model@, b.model@, c.model@, points@[j].model@),
         decreases pcnt - i,
     {
         let sign = orient3d_sign_exec(a, b, c, &points[i]);
@@ -428,7 +428,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
             _ => {
                 proof {
                     lemma_orient3d_not_positive_for_point(
-                        points, a@, b@, c@, i as int,
+                        points, a.model@, b.model@, c.model@, i as int,
                     );
                 }
             }
@@ -441,7 +441,7 @@ pub fn check_convex_hull_face_3d<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     proof {
         let pt_views = Seq::new(points@.len(), |i: int| points@[i].model@);
         assert forall|j: int| 0 <= j < pt_views.len() implies
-            !orient3d_positive::<V>(a@, b@, c@, #[trigger] pt_views[j])
+            !orient3d_positive::<V>(a.model@, b.model@, c.model@, #[trigger] pt_views[j])
         by {
             assert(pt_views[j] == points@[j].model@);
         }
