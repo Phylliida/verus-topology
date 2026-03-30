@@ -161,10 +161,10 @@ proof fn lemma_prefix_nonneg<T: OrderedRing>(
 }
 
 ///  Bridge: ray_hits_triangle_nodiv_exec result matches ray_hits_face spec.
-proof fn lemma_ray_hits_face_bridge(
+proof fn lemma_ray_hits_face_bridge<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
     f: int,
-    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
+    origin: &RuntimePoint3<R, V>, dir: &RuntimePoint3<R, V>,
     v0: int, v1: int, v2: int,
     exec_result: bool,
 )
@@ -202,7 +202,7 @@ proof fn lemma_ray_hits_face_bridge(
 ///  Count the number of mesh faces hit by a ray (runtime).
 pub fn ray_crossing_count_exec<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
-    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
+    origin: &RuntimePoint3<R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (count: usize)
     requires
         structurally_valid(m),
@@ -277,7 +277,7 @@ pub fn ray_crossing_count_exec<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
 ///  this can be checked or guaranteed by perturbation.
 pub fn check_point_in_solid<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
-    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
+    origin: &RuntimePoint3<R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (out: bool)
     requires
         structurally_valid(m),
@@ -402,12 +402,12 @@ pub open spec fn ray_general_position<T: OrderedRing>(
 }
 
 ///  Bridge: exec computation of Moller-Trumbore parameters matches face-level specs.
-proof fn lemma_ray_face_params_bridge(
+proof fn lemma_ray_face_params_bridge<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
-    f: int, origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
+    f: int, origin: &RuntimePoint3<R, V>, dir: &RuntimePoint3<R, V>,
     v0: int, v1: int, v2: int,
-    det_exec: &RuntimeRational, u_exec: &RuntimeRational,
-    v_exec: &RuntimeRational, t_exec: &RuntimeRational,
+    det_exec: &R, u_exec: &R,
+    v_exec: &R, t_exec: &R,
 )
     requires
         index_bounds(m),
@@ -422,15 +422,15 @@ proof fn lemma_ray_face_params_bridge(
         m.half_edges@[m.face_half_edges@[f] as int].vertex as int == v0,
         m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].vertex as int == v1,
         m.half_edges@[m.half_edges@[m.half_edges@[m.face_half_edges@[f] as int].next as int].next as int].vertex as int == v2,
-        det_exec@ == ray_tri_det::<V>(dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
-        u_exec@ == ray_tri_u_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
-        v_exec@ == ray_tri_v_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
-        t_exec@ == ray_tri_t_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        det_exec.model() == ray_tri_det::<V>(dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        u_exec.model() == ray_tri_u_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        v_exec.model() == ray_tri_v_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
+        t_exec.model() == ray_tri_t_unnorm::<V>(origin.model@, dir.model@, pos@[v0].model@, pos@[v1].model@, pos@[v2].model@),
     ensures
-        det_exec@ == ray_face_det::<V>(m, pos_view_3d(pos), f, dir.model@),
-        u_exec@ == ray_face_u::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
-        v_exec@ == ray_face_v::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
-        t_exec@ == ray_face_t::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
+        det_exec.model() == ray_face_det::<V>(m, pos_view_3d(pos), f, dir.model@),
+        u_exec.model() == ray_face_u::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
+        v_exec.model() == ray_face_v::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
+        t_exec.model() == ray_face_t::<V>(m, pos_view_3d(pos), f, origin.model@, dir.model@),
 {
     let pv = pos_view_3d(pos);
     assert(pv[v0] == pos@[v0].model@);
@@ -445,7 +445,7 @@ proof fn lemma_ray_face_params_bridge(
 ///  has a boundary hit (any of det, u, v, det-u-v, or t is zero).
 pub fn check_ray_general_position<R: RuntimeOrderedFieldOps<V>, V: OrderedField>(
     m: &Mesh, pos: &Vec<RuntimePoint3<R, V>>,
-    origin: &RuntimePoint3<R, V><R, V>, dir: &RuntimePoint3<R, V>,
+    origin: &RuntimePoint3<R, V>, dir: &RuntimePoint3<R, V>,
 ) -> (out: bool)
     requires
         structurally_valid(m),
